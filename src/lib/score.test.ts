@@ -1,0 +1,42 @@
+import { describe, expect, it } from "vitest";
+import { getAttemptPoints, getMedal, getSpeedBonus, scoreQuestion } from "@/lib/score";
+
+describe("scoring", () => {
+  it("awards attempt points for first, second, and third try solves", () => {
+    expect(getAttemptPoints(true, 1)).toBe(100);
+    expect(getAttemptPoints(true, 2)).toBe(70);
+    expect(getAttemptPoints(true, 3)).toBe(40);
+    expect(getAttemptPoints(false, 3)).toBe(0);
+  });
+
+  it("awards speed bonuses only for solved questions", () => {
+    expect(getSpeedBonus(true, 9.9)).toBe(30);
+    expect(getSpeedBonus(true, 10)).toBe(20);
+    expect(getSpeedBonus(true, 29.9)).toBe(20);
+    expect(getSpeedBonus(true, 30)).toBe(10);
+    expect(getSpeedBonus(true, 60)).toBe(0);
+    expect(getSpeedBonus(false, 5)).toBe(0);
+  });
+
+  it("combines attempt points and speed bonuses", () => {
+    const result = scoreQuestion({
+      problemId: "p1",
+      difficulty: "medium",
+      selectedChoiceIds: ["A", "C"],
+      correctChoiceId: "C",
+      solved: true,
+      elapsedSeconds: 24
+    });
+
+    expect(result.score).toBe(90);
+    expect(result.attemptPoints).toBe(70);
+    expect(result.speedBonus).toBe(20);
+  });
+
+  it("maps score thresholds to medals", () => {
+    expect(getMedal(330)).toBe("gold");
+    expect(getMedal(240)).toBe("silver");
+    expect(getMedal(150)).toBe("bronze");
+    expect(getMedal(149)).toBe("practice");
+  });
+});

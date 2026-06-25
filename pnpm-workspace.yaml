@@ -1,0 +1,17 @@
+packages:
+  - .
+
+confirmModulesPurge: false
+
+allowBuilds:
+  esbuild: true
+  sharp: false
+
+minimumReleaseAgeExclude:
+  - '@types/node@26.0.1'
+
+onlyBuiltDependencies:
+  - esbuild
+
+ignoredBuiltDependencies:
+  - sharp
