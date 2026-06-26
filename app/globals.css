@@ -688,6 +688,11 @@ button:disabled {
 }
 
 @media (max-width: 560px) {
+  html,
+  body {
+    background: #fff;
+  }
+
   .app-shell {
     padding: 0;
   }
@@ -697,6 +702,8 @@ button:disabled {
     min-height: 100svh;
     border: 0;
     border-radius: 0;
+    background: #fff;
+    box-shadow: none;
   }
 
   .quiz-card {
@@ -706,10 +713,6 @@ button:disabled {
   .quiz-topbar {
     grid-template-columns: 66px minmax(0, 1fr) 84px;
     gap: 10px;
-  }
-
-  .answer-grid {
-    grid-template-columns: 1fr;
   }
 
   .feedback-sheet {
