@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowRight, Check, Clock3, Flame, Medal, Play, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Medal, Play, Trophy } from "lucide-react";
 import { FormEvent, memo, useEffect, useMemo, useState } from "react";
+import threeQsLogo from "../../app/3q.svg";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
@@ -118,16 +119,28 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   }
 
   function handleNextQuestion() {
-    if (!checkedResult) {
+    const storedResult = getQuestionResultAt(questionResults, currentIndex);
+
+    if (!checkedResult && !storedResult) {
       return;
     }
 
-    const nextQuestionResults = [...questionResults, checkedResult];
-    setQuestionResults(nextQuestionResults);
+    const nextQuestionResults = storedResult
+      ? questionResults
+      : upsertQuestionResult(questionResults, currentIndex, checkedResult);
+
+    if (!storedResult) {
+      setQuestionResults(nextQuestionResults);
+    }
 
     if (currentIndex < dailyProblems.length - 1) {
-      setCurrentIndex((value) => value + 1);
-      startQuestion();
+      moveToQuestion(currentIndex + 1, nextQuestionResults);
+      return;
+    }
+
+    const completeResults = getCompleteQuestionResults(nextQuestionResults, dailyProblems.length);
+
+    if (!completeResults) {
       return;
     }
 
@@ -135,10 +148,32 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       buildDailyResult({
         dateKey,
         studentName,
-        questionResults: nextQuestionResults
+        questionResults: completeResults
       })
     );
     setMode("score");
+  }
+
+  function handleBackQuestion() {
+    const storedResult = getQuestionResultAt(questionResults, currentIndex);
+    const nextQuestionResults =
+      !storedResult && checkedResult
+        ? upsertQuestionResult(questionResults, currentIndex, checkedResult)
+        : questionResults;
+
+    if (nextQuestionResults !== questionResults) {
+      setQuestionResults(nextQuestionResults);
+    }
+
+    if (currentIndex === 0) {
+      setCurrentIndex(0);
+      setSelectedChoiceId(null);
+      setCheckedResult(null);
+      setMode("home");
+      return;
+    }
+
+    moveToQuestion(currentIndex - 1, nextQuestionResults);
   }
 
   function handleNextReviewQuestion() {
@@ -148,6 +183,26 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     }
 
     setMode("score");
+  }
+
+  function handleBackReviewQuestion() {
+    if (currentIndex === 0) {
+      setCurrentIndex(0);
+      setMode("home");
+      return;
+    }
+
+    setCurrentIndex((value) => value - 1);
+  }
+
+  function moveToQuestion(index: number, results: QuestionResult[]) {
+    setCurrentIndex(index);
+    setSelectedChoiceId(null);
+    setCheckedResult(null);
+
+    if (!getQuestionResultAt(results, index)) {
+      setQuestionStart(performance.now());
+    }
   }
 
   function handleScoreContinue() {
@@ -185,6 +240,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
         <QuestionScreen
           currentIndex={currentIndex}
           isReview={mode === "review"}
+          onBack={mode === "review" ? handleBackReviewQuestion : handleBackQuestion}
           onCheck={handleCheck}
           onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
           onSelectChoice={setSelectedChoiceId}
@@ -192,8 +248,8 @@ export function DailyGame({ today, storage }: DailyGameProps) {
           questionStart={questionStart}
           result={checkedResult}
           reviewResult={mode === "review" ? currentResult?.questionResults[currentIndex] ?? null : null}
+          savedResult={mode === "quiz" ? getQuestionResultAt(questionResults, currentIndex) : null}
           selectedChoiceId={selectedChoiceId}
-          studentName={studentName}
           totalQuestions={dailyProblems.length}
         />
       ) : null}
@@ -220,10 +276,8 @@ type HomeScreenProps = {
 function HomeScreen({ dateKey, nameInput, onNameChange, onSubmit, streak }: HomeScreenProps) {
   return (
     <section className="app-card home-card" aria-label="Three Qs home">
-      <div className="home-art" aria-hidden="true">
-        <div className="math-bubble bubble-one">3</div>
-        <div className="math-bubble bubble-two">x</div>
-        <div className="math-bubble bubble-three">?</div>
+      <div className="home-logo-wrap" aria-hidden="true">
+        <img alt="" className="home-logo" src={threeQsLogo.src} />
       </div>
 
       <div className="home-copy">
@@ -266,6 +320,7 @@ function HomeScreen({ dateKey, nameInput, onNameChange, onSubmit, streak }: Home
 type QuestionScreenProps = {
   currentIndex: number;
   isReview: boolean;
+  onBack(): void;
   onCheck(): void;
   onNext(): void;
   onSelectChoice(choiceId: string): void;
@@ -273,14 +328,15 @@ type QuestionScreenProps = {
   questionStart: number;
   result: QuestionResult | null;
   reviewResult: QuestionResult | null;
+  savedResult: QuestionResult | null;
   selectedChoiceId: string | null;
-  studentName: string;
   totalQuestions: number;
 };
 
 function QuestionScreen({
   currentIndex,
   isReview,
+  onBack,
   onCheck,
   onNext,
   onSelectChoice,
@@ -288,22 +344,22 @@ function QuestionScreen({
   questionStart,
   result,
   reviewResult,
+  savedResult,
   selectedChoiceId,
-  studentName,
   totalQuestions
 }: QuestionScreenProps) {
-  const firstLetter = studentName.charAt(0).toUpperCase() || "?";
-  const displayResult = isReview ? reviewResult : result;
+  const displayResult = isReview ? reviewResult : savedResult ?? result;
   const displaySelectedChoiceId = isReview
     ? reviewResult?.selectedChoiceIds.at(-1) ?? null
-    : selectedChoiceId;
+    : savedResult?.selectedChoiceIds.at(-1) ?? selectedChoiceId;
+  const isViewingSavedAnswer = Boolean(isReview || savedResult);
 
   return (
     <section className="app-card quiz-card" aria-label="Question screen">
       <header className="quiz-topbar">
-        <div className="avatar" aria-label={`Account ${firstLetter}`}>
-          {firstLetter}
-        </div>
+        <button className="back-button" aria-label="Back" onClick={onBack} type="button">
+          <ArrowLeft size={23} />
+        </button>
 
         <div className="segmented-progress" aria-label={`Question ${currentIndex + 1} of ${totalQuestions}`}>
           {Array.from({ length: totalQuestions }).map((_, index) => (
@@ -328,7 +384,6 @@ function QuestionScreen({
       </header>
 
       <div className="quiz-content">
-        <p className="question-count">Question {currentIndex + 1} of {totalQuestions}</p>
         <div className="quiz-prompt">
           <MathText text={problem.prompt} />
         </div>
@@ -367,7 +422,7 @@ function QuestionScreen({
       </div>
 
       <div className="quiz-footer">
-        {isReview ? (
+        {isViewingSavedAnswer ? (
           <button className="primary-action check-action" onClick={onNext} type="button">
             <ArrowRight size={19} />
             Next
@@ -385,7 +440,7 @@ function QuestionScreen({
         )}
       </div>
 
-      {!isReview && result ? (
+      {!isReview && !savedResult && result ? (
         <FeedbackSheet
           isFinalQuestion={currentIndex + 1 === totalQuestions}
           onNext={onNext}
@@ -552,4 +607,38 @@ function averageTime(results: QuestionResult[]): number {
   }
 
   return results.reduce((sum, result) => sum + result.elapsedSeconds, 0) / results.length;
+}
+
+function getQuestionResultAt(results: QuestionResult[], index: number): QuestionResult | null {
+  return results[index] ?? null;
+}
+
+function upsertQuestionResult(
+  results: QuestionResult[],
+  index: number,
+  result: QuestionResult | null
+): QuestionResult[] {
+  if (!result) {
+    return results;
+  }
+
+  const nextResults = [...results];
+  nextResults[index] = result;
+  return nextResults;
+}
+
+function getCompleteQuestionResults(results: QuestionResult[], totalQuestions: number): QuestionResult[] | null {
+  const completeResults: QuestionResult[] = [];
+
+  for (let index = 0; index < totalQuestions; index += 1) {
+    const result = results[index];
+
+    if (!result) {
+      return null;
+    }
+
+    completeResults.push(result);
+  }
+
+  return completeResults;
 }

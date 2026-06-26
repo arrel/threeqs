@@ -37,7 +37,7 @@ describe("DailyGame", () => {
     rerender(<DailyGame storage={storage} today={today} />);
     await user.click(getButtonByText(/^play$/i));
 
-    expect(screen.getByText(/Question 1 of 3/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
     expect(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`)).toHaveAttribute(
       "aria-pressed",
       "true"
@@ -50,7 +50,40 @@ describe("DailyGame", () => {
     }
 
     expect(screen.getByText(/challenge complete/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Question 1 of 3/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Question 1 of 3/i)).not.toBeInTheDocument();
+  });
+
+  it("uses the back button to revisit answered questions and return home from the first question", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const dailyProblems = selectDailyProblems(problems, dateKey);
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+
+    await user.click(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`));
+    await user.click(getButtonByText(/^check$/i));
+    await user.click(getButtonByText(/^next$/i));
+
+    expect(screen.getByLabelText(/Question 2 of 3/i)).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Back"));
+
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
+    expect(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`)).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(getButtonByText(/^next$/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^check$/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Back"));
+
+    expect(screen.getByRole("heading", { name: "Three Qs" })).toBeInTheDocument();
   });
 });
 
