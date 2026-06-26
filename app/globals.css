@@ -87,6 +87,9 @@ button:disabled {
   align-content: stretch;
   grid-template-rows: auto auto minmax(var(--home-spacer-height), 1fr) auto auto minmax(var(--home-spacer-height), 1fr) auto;
   gap: 0;
+  /* Bottom + horizontal insets match .quiz-footer so the Play button lands in
+     the exact same spot as the Check button on the question screen. */
+  padding: clamp(26px, 7vw, 44px) clamp(18px, 5vw, 32px) 24px;
   --home-spacer-height: 48px;
 }
 
@@ -332,16 +335,18 @@ button:disabled {
 }
 
 .quiz-content {
-  display: grid;
-  align-content: center;
-  padding: 32px 0 102px;
+  display: flex;
+  flex-direction: column;
+  /* Bottom padding reserves room for the absolutely-positioned Check button. */
+  padding: 0 0 102px;
 }
 
 .quiz-prompt {
-  min-height: 130px;
+  flex: 1;
   display: grid;
   place-items: center;
-  margin: 0 auto 30px;
+  margin: 0 auto;
+  padding: 24px 0;
   max-width: 22rem;
   font-size: clamp(1.7rem, 7vw, 2.55rem);
   font-weight: 800;
@@ -496,8 +501,28 @@ button:disabled {
 
 .score-card,
 .streak-card {
-  justify-items: center;
+  display: flex;
+  flex-direction: column;
+  /* Match the home/quiz CTA insets so the Continue button always lands in the
+     exact same spot as the Play and Check buttons. */
+  padding: clamp(26px, 7vw, 44px) clamp(18px, 5vw, 32px) 24px;
   text-align: center;
+}
+
+/* Content fills and centers in the space above the pinned bottom CTA. */
+.card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.score-card .primary-action,
+.streak-card .primary-action {
+  width: 100%;
 }
 
 .medal-emblem {
@@ -533,29 +558,65 @@ button:disabled {
   font-weight: 900;
 }
 
-.score-stats {
+.question-breakdown {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.score-stats div {
-  padding: 18px 12px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: #fffaf0;
+.question-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 18px;
+  border-radius: 18px;
+  text-align: left;
 }
 
-.score-stats strong {
-  display: block;
-  font-size: 1.7rem;
+.question-row.gold {
+  background: var(--yellow);
+  color: #7c4a00;
+}
+
+.question-row.silver {
+  background: #e7dac6;
+  color: #6b584a;
+}
+
+.question-row.bronze {
+  background: #f0cdb1;
+  color: #8a4a22;
+}
+
+.question-points {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 58px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.question-points strong {
+  font-size: 1.05rem;
   font-weight: 800;
 }
 
-.score-stats span {
-  color: var(--muted);
-  font-weight: 600;
+.question-status {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.question-time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .streak-card {
@@ -611,6 +672,13 @@ button:disabled {
 
 .math-text .katex .mathnormal {
   font-style: italic;
+}
+
+/* KaTeX defaults the root .katex to 1.21em; reset it so math matches the
+   surrounding text size. Only the root is touched — inner spans use relative
+   em units for scripts/fractions and must keep their scaling. */
+.math-text .katex {
+  font-size: 1em;
 }
 
 @media (min-width: 780px) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAttemptPoints, getMedal, getSpeedBonus, scoreQuestion } from "@/lib/score";
+import { getAttemptPoints, getMedal, getQuestionMedal, getSpeedBonus, scoreQuestion } from "@/lib/score";
 
 describe("scoring", () => {
   it("awards attempt points for first and second try solves", () => {
@@ -38,5 +38,13 @@ describe("scoring", () => {
     expect(getMedal(240)).toBe("silver");
     expect(getMedal(150)).toBe("bronze");
     expect(getMedal(149)).toBe("practice");
+  });
+
+  it("maps per-question scores to gold, silver, or bronze", () => {
+    expect(getQuestionMedal(130)).toBe("gold");
+    expect(getQuestionMedal(100)).toBe("gold");
+    expect(getQuestionMedal(80)).toBe("silver");
+    expect(getQuestionMedal(50)).toBe("silver");
+    expect(getQuestionMedal(0)).toBe("bronze");
   });
 });

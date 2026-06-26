@@ -81,6 +81,22 @@ export function getMedal(totalScore: number): Medal {
   return "practice";
 }
 
+export type QuestionMedal = "gold" | "silver" | "bronze";
+
+// Per-question medal derived from that question's score (max 130). With the
+// scoring rules, gold == first-try, silver == second-try, bronze == missed.
+export function getQuestionMedal(score: number): QuestionMedal {
+  if (score >= 100) {
+    return "gold";
+  }
+
+  if (score >= 50) {
+    return "silver";
+  }
+
+  return "bronze";
+}
+
 export function getMedalLabel(medal: Medal): string {
   if (medal === "gold") {
     return "Gold";

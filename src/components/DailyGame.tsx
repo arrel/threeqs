@@ -5,9 +5,16 @@ import { FormEvent, memo, useEffect, useMemo, useState } from "react";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
-import { selectDailyProblems } from "@/lib/daily";
+import { selectDailyProblems, shuffleWithSeed } from "@/lib/daily";
 import { fetchRemoteHistory, saveRemoteDailyResult } from "@/lib/remoteResults";
-import { MAX_ATTEMPTS, MAX_DAILY_SCORE, buildDailyResult, getMedalLabel, scoreQuestion } from "@/lib/score";
+import {
+  MAX_ATTEMPTS,
+  MAX_DAILY_SCORE,
+  buildDailyResult,
+  getMedalLabel,
+  getQuestionMedal,
+  scoreQuestion
+} from "@/lib/score";
 import {
   calculateCurrentStreak,
   getSavedStudentName,
@@ -493,6 +500,13 @@ function QuestionScreen({
       displayResult.attemptsUsed < MAX_ATTEMPTS
   );
 
+  // Shuffle choices deterministically per problem so the order is randomized
+  // but stays stable across re-renders, attempts, navigation, and review.
+  const orderedChoices = useMemo(
+    () => shuffleWithSeed(problem.choices, problem.id),
+    [problem.id, problem.choices]
+  );
+
   return (
     <section className="app-card quiz-card" aria-label="Question screen">
       <header className="quiz-topbar">
@@ -528,7 +542,7 @@ function QuestionScreen({
         </div>
 
         <div className="answer-grid">
-          {problem.choices.map((choice) => {
+          {orderedChoices.map((choice, index) => {
             const isSelected = displaySelectedChoiceId === choice.id;
             const isAttemptedWrong =
               displayAttemptedChoiceIds.includes(choice.id) && choice.id !== problem.correctChoiceId;
@@ -555,7 +569,7 @@ function QuestionScreen({
                 onClick={() => onSelectChoice(choice.id)}
                 type="button"
               >
-                <span className="answer-letter">{choice.id}</span>
+                <span className="answer-letter">{String.fromCharCode(65 + index)}</span>
                 <span className="answer-text">
                   <MathText text={choice.label} />
                 </span>
@@ -718,32 +732,35 @@ type ScoreScreenProps = {
 };
 
 function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
-  const solvedCount = result.questionResults.filter((entry) => entry.solved).length;
   const medalLabel = getMedalLabel(result.medal);
 
   return (
     <section className="app-card score-card" aria-label="Completion score">
-      <div className={`medal-emblem ${result.medal}`}>
-        {result.medal === "gold" ? <Trophy size={54} /> : <Medal size={54} />}
-      </div>
-
-      <div className="score-copy">
-        <p className="today-label">Challenge complete</p>
-        <h1>{medalLabel}</h1>
-        <p>
-          You scored <strong>{result.totalScore}</strong> out of {MAX_DAILY_SCORE} points.
-        </p>
-      </div>
-
-      <div className="score-stats">
-        <div>
-          <strong>{solvedCount}/3</strong>
-          <span>correct</span>
+      <div className="card-body">
+        <div className={`medal-emblem ${result.medal}`}>
+          {result.medal === "gold" ? <Trophy size={54} /> : <Medal size={54} />}
         </div>
-        <div>
-          <strong>{Math.round(averageTime(result.questionResults))}s</strong>
-          <span>avg time</span>
+
+        <div className="score-copy">
+          <p className="today-label">Challenge complete</p>
+          <h1>{medalLabel}</h1>
+          <p>
+            You scored <strong>{result.totalScore}</strong> out of {MAX_DAILY_SCORE} points.
+          </p>
         </div>
+
+        <ul className="question-breakdown">
+          {result.questionResults.map((question) => (
+            <li className={`question-row ${getQuestionMedal(question.score)}`} key={question.problemId}>
+              <span className="question-points">
+                <strong>{question.score}</strong>
+                pts
+              </span>
+              <span className="question-status">{getAttemptLabel(question)}</span>
+              <span className="question-time">{Math.round(question.elapsedSeconds)}s</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <button className="primary-action" disabled={isSaving} onClick={onContinue} type="button">
@@ -751,6 +768,14 @@ function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
       </button>
     </section>
   );
+}
+
+function getAttemptLabel(result: QuestionResult): string {
+  if (!result.solved) {
+    return "Missed";
+  }
+
+  return result.attemptsUsed === 1 ? "First try" : "Second try";
 }
 
 type StreakScreenProps = {
@@ -761,14 +786,16 @@ type StreakScreenProps = {
 function StreakScreen({ onContinue, streak }: StreakScreenProps) {
   return (
     <section className="app-card streak-card" aria-label="Current streak">
-      <div className="streak-burst" aria-hidden="true">
-        <Flame size={86} fill="currentColor" />
-      </div>
+      <div className="card-body">
+        <div className="streak-burst" aria-hidden="true">
+          <Flame size={86} fill="currentColor" />
+        </div>
 
-      <div className="streak-copy">
-        <p className="today-label">Current streak</p>
-        <h1>{streak}</h1>
-        <p>{streak === 1 ? "day" : "days"} in a row</p>
+        <div className="streak-copy">
+          <p className="today-label">Current streak</p>
+          <h1>{streak}</h1>
+          <p>{streak === 1 ? "day" : "days"} in a row</p>
+        </div>
       </div>
 
       <button className="primary-action" onClick={onContinue} type="button">
@@ -776,14 +803,6 @@ function StreakScreen({ onContinue, streak }: StreakScreenProps) {
       </button>
     </section>
   );
-}
-
-function averageTime(results: QuestionResult[]): number {
-  if (results.length === 0) {
-    return 0;
-  }
-
-  return results.reduce((sum, result) => sum + result.elapsedSeconds, 0) / results.length;
 }
 
 function getQuestionResultAt(results: QuestionResult[], index: number): QuestionResult | null {
