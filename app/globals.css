@@ -83,17 +83,15 @@ button:disabled {
   padding: clamp(26px, 7vw, 44px);
 }
 
-.home-logo-wrap {
-  display: grid;
-  min-height: 170px;
-  place-items: center;
+.home-card {
+  align-content: stretch;
+  grid-template-rows: auto auto minmax(var(--home-spacer-height), 1fr) auto auto minmax(var(--home-spacer-height), 1fr) auto;
+  gap: 0;
+  --home-spacer-height: 48px;
 }
 
-.home-logo {
-  display: block;
-  width: min(132px, 38vw);
-  height: auto;
-  filter: drop-shadow(0 20px 32px rgba(51, 38, 20, 0.12));
+.home-top-spacer {
+  min-height: var(--home-spacer-height);
 }
 
 .home-copy,
@@ -109,6 +107,15 @@ button:disabled {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.home-date {
+  margin: 0 0 14px;
+  text-align: center;
+}
+
+.home-spacer {
+  min-height: var(--home-spacer-height);
 }
 
 .home-copy h1,
@@ -229,6 +236,16 @@ button:disabled {
   background: #dfcdb2;
   color: #856d5a;
   box-shadow: none;
+}
+
+.home-play-action {
+  background: var(--green);
+  box-shadow: 0 14px 28px rgba(52, 199, 89, 0.22);
+}
+
+.home-play-action:disabled {
+  background: #c9dec2;
+  color: #5f7a5b;
 }
 
 .quiz-card {
@@ -451,6 +468,22 @@ button:disabled {
 .sheet-next {
   min-height: 54px;
   box-shadow: none;
+}
+
+.feedback-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.sheet-secondary {
+  min-height: 54px;
+  border: 1.5px solid rgba(var(--ink-rgb), 0.14);
+  border-radius: 999px;
+  background: #fffaf0;
+  color: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .feedback-sheet.correct .sheet-next {

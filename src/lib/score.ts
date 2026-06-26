@@ -1,6 +1,6 @@
 import type { DailyResult, Medal, QuestionResult } from "@/lib/types";
 
-export const MAX_ATTEMPTS = 3;
+export const MAX_ATTEMPTS = 2;
 export const MAX_DAILY_SCORE = 390;
 
 export function getAttemptPoints(solved: boolean, attemptsUsed: number): number {
@@ -13,11 +13,7 @@ export function getAttemptPoints(solved: boolean, attemptsUsed: number): number 
   }
 
   if (attemptsUsed === 2) {
-    return 70;
-  }
-
-  if (attemptsUsed === 3) {
-    return 40;
+    return 50;
   }
 
   return 0;

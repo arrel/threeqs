@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { getAttemptPoints, getMedal, getSpeedBonus, scoreQuestion } from "@/lib/score";
 
 describe("scoring", () => {
-  it("awards attempt points for first, second, and third try solves", () => {
+  it("awards attempt points for first and second try solves", () => {
     expect(getAttemptPoints(true, 1)).toBe(100);
-    expect(getAttemptPoints(true, 2)).toBe(70);
-    expect(getAttemptPoints(true, 3)).toBe(40);
-    expect(getAttemptPoints(false, 3)).toBe(0);
+    expect(getAttemptPoints(true, 2)).toBe(50);
+    expect(getAttemptPoints(true, 3)).toBe(0);
+    expect(getAttemptPoints(false, 2)).toBe(0);
   });
 
   it("awards speed bonuses only for solved questions", () => {
@@ -28,8 +28,8 @@ describe("scoring", () => {
       elapsedSeconds: 24
     });
 
-    expect(result.score).toBe(90);
-    expect(result.attemptPoints).toBe(70);
+    expect(result.score).toBe(70);
+    expect(result.attemptPoints).toBe(50);
     expect(result.speedBonus).toBe(20);
   });
 

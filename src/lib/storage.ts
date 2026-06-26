@@ -149,6 +149,21 @@ export function saveDailyResult(result: DailyResult, storage = getBrowserStorage
   writeStoredResults(payload, storage);
 }
 
+export function replaceStudentHistory(
+  name: string,
+  results: DailyResult[],
+  storage = getBrowserStorage()
+): void {
+  const studentKey = getStudentKey(name);
+  if (!studentKey) {
+    return;
+  }
+
+  const payload = readStoredResults(storage);
+  payload.students[studentKey] = [...results].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  writeStoredResults(payload, storage);
+}
+
 export function calculateCurrentStreak(results: DailyResult[], todayKey: string): number {
   const completedDates = new Set(results.map((result) => result.dateKey));
   let cursor = completedDates.has(todayKey) ? todayKey : previousDateKey(todayKey);

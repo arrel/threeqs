@@ -4,6 +4,7 @@ import {
   getDailyResult,
   getStudentHistory,
   normalizeStudentName,
+  replaceStudentHistory,
   saveDailyResult,
   type StorageLike
 } from "@/lib/storage";
@@ -24,6 +25,16 @@ describe("local result storage", () => {
 
     expect(getStudentHistory("ada", storage)).toHaveLength(1);
     expect(getDailyResult("Ada", "2026-06-24", storage)?.totalScore).toBe(330);
+  });
+
+  it("replaces cached history for one student", () => {
+    const storage = createMemoryStorage();
+    saveDailyResult(createResult("Ada", "2026-06-24", 240), storage);
+
+    replaceStudentHistory("Ada", [createResult("Ada", "2026-06-25", 330)], storage);
+
+    expect(getDailyResult("Ada", "2026-06-24", storage)).toBeUndefined();
+    expect(getDailyResult("Ada", "2026-06-25", storage)?.totalScore).toBe(330);
   });
 
   it("calculates a streak using completed local days", () => {

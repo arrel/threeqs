@@ -2,18 +2,18 @@
 
 import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Medal, Play, Trophy } from "lucide-react";
 import { FormEvent, memo, useEffect, useMemo, useState } from "react";
-import threeQsLogo from "../../app/3q.svg";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems } from "@/lib/daily";
-import { MAX_DAILY_SCORE, buildDailyResult, getMedalLabel, scoreQuestion } from "@/lib/score";
+import { fetchRemoteHistory, saveRemoteDailyResult } from "@/lib/remoteResults";
+import { MAX_ATTEMPTS, MAX_DAILY_SCORE, buildDailyResult, getMedalLabel, scoreQuestion } from "@/lib/score";
 import {
   calculateCurrentStreak,
-  getDailyResult,
   getSavedStudentName,
   getStudentHistory,
   normalizeStudentName,
+  replaceStudentHistory,
   saveDailyResult,
   saveStudentName,
   type StorageLike
@@ -31,20 +31,25 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   const dateKey = useMemo(() => getPacificDateKey(today), [today]);
   const dailyProblems = useMemo(() => selectDailyProblems(problems, dateKey), [dateKey]);
   const activeStorage = storage;
+  const shouldUseRemoteResults = storage === undefined;
 
   const [mode, setMode] = useState<GameMode>("home");
   const [nameInput, setNameInput] = useState("");
   const [studentName, setStudentName] = useState("");
   const [history, setHistory] = useState<DailyResult[]>([]);
+  const [homeHistory, setHomeHistory] = useState<DailyResult[]>([]);
   const [currentResult, setCurrentResult] = useState<DailyResult | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [questionStart, setQuestionStart] = useState(() => performance.now());
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
+  const [attemptedChoiceIds, setAttemptedChoiceIds] = useState<string[]>([]);
   const [checkedResult, setCheckedResult] = useState<QuestionResult | null>(null);
+  const [isCurrentQuestionFinalized, setIsCurrentQuestionFinalized] = useState(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isSavingResult, setIsSavingResult] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
-  const homeHistory = trimmedInput ? getStudentHistory(trimmedInput, activeStorage) : [];
   const homeStreak = calculateCurrentStreak(homeHistory, dateKey);
   const streak = calculateCurrentStreak(history, dateKey);
   const currentProblem = dailyProblems[currentIndex];
@@ -58,42 +63,98 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 
     setNameInput(savedName);
     setStudentName(savedName);
-    setHistory(getStudentHistory(savedName, activeStorage));
+    const savedHistory = getStudentHistory(savedName, activeStorage);
+    setHistory(savedHistory);
+    setHomeHistory(savedHistory);
   }, [activeStorage]);
 
-  function handleStart(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (!trimmedInput) {
+      setHomeHistory([]);
+      return undefined;
+    }
+
+    const localHistory = getStudentHistory(trimmedInput, activeStorage);
+    setHomeHistory(localHistory);
+
+    if (!shouldUseRemoteResults) {
+      return undefined;
+    }
+
+    let isCanceled = false;
+
+    loadRemoteHistoryWithLocalFallback(trimmedInput, activeStorage)
+      .then((remoteHistory) => {
+        if (!isCanceled) {
+          setHomeHistory(remoteHistory);
+        }
+      })
+      .catch(() => {
+        if (!isCanceled) {
+          setHomeHistory(localHistory);
+        }
+      });
+
+    return () => {
+      isCanceled = true;
+    };
+  }, [activeStorage, shouldUseRemoteResults, trimmedInput]);
+
+  async function handleStart(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!trimmedInput) {
+    if (!trimmedInput || isStarting) {
       return;
     }
 
     saveStudentName(trimmedInput, activeStorage);
     setStudentName(trimmedInput);
+    setIsStarting(true);
 
-    const existingResult = getDailyResult(trimmedInput, dateKey, activeStorage);
-    const nextHistory = getStudentHistory(trimmedInput, activeStorage);
-    setHistory(nextHistory);
+    try {
+      const nextHistory = shouldUseRemoteResults
+        ? await loadRemoteHistoryWithLocalFallback(trimmedInput, activeStorage)
+        : getStudentHistory(trimmedInput, activeStorage);
+      const existingResult = nextHistory.find((result) => result.dateKey === dateKey);
+      setHistory(nextHistory);
+      setHomeHistory(nextHistory);
 
-    if (existingResult) {
-      setCurrentResult(existingResult);
-      setQuestionResults(existingResult.questionResults);
+      if (existingResult) {
+        setCurrentResult(existingResult);
+        setQuestionResults(existingResult.questionResults);
+        setCurrentIndex(0);
+        setMode("review");
+        return;
+      }
+
+      if (
+        studentName === trimmedInput &&
+        (questionResults.some(Boolean) ||
+          attemptedChoiceIds.length > 0 ||
+          Boolean(checkedResult) ||
+          currentIndex > 0)
+      ) {
+        setCurrentResult(null);
+        setMode("quiz");
+        return;
+      }
+
+      setCurrentResult(null);
+      setQuestionResults([]);
       setCurrentIndex(0);
-      setMode("review");
-      return;
+      startQuestion();
+      setMode("quiz");
+    } finally {
+      setIsStarting(false);
     }
-
-    setCurrentResult(null);
-    setQuestionResults([]);
-    setCurrentIndex(0);
-    startQuestion();
-    setMode("quiz");
   }
 
   function startQuestion() {
     const start = performance.now();
     setSelectedChoiceId(null);
+    setAttemptedChoiceIds([]);
     setCheckedResult(null);
+    setIsCurrentQuestionFinalized(false);
     setQuestionStart(start);
   }
 
@@ -104,24 +165,47 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 
     const answeredAt = performance.now();
     const exactElapsedSeconds = Math.max(0, (answeredAt - questionStart) / 1000);
+    const nextSelectedChoiceIds = [...attemptedChoiceIds, selectedChoiceId];
     const solved = selectedChoiceId === currentProblem.correctChoiceId;
+    const nextResult = scoreQuestion({
+      problemId: currentProblem.id,
+      difficulty: currentProblem.difficulty,
+      selectedChoiceIds: nextSelectedChoiceIds,
+      correctChoiceId: currentProblem.correctChoiceId,
+      solved,
+      elapsedSeconds: Number(exactElapsedSeconds.toFixed(1))
+    });
 
-    setCheckedResult(
-      scoreQuestion({
-        problemId: currentProblem.id,
-        difficulty: currentProblem.difficulty,
-        selectedChoiceIds: [selectedChoiceId],
-        correctChoiceId: currentProblem.correctChoiceId,
-        solved,
-        elapsedSeconds: Number(exactElapsedSeconds.toFixed(1))
-      })
-    );
+    setAttemptedChoiceIds(nextSelectedChoiceIds);
+    setSelectedChoiceId(null);
+    setCheckedResult(nextResult);
+    setIsCurrentQuestionFinalized(solved || nextSelectedChoiceIds.length >= MAX_ATTEMPTS);
+  }
+
+  function handleTryAgain() {
+    if (!checkedResult || checkedResult.solved || checkedResult.attemptsUsed >= MAX_ATTEMPTS) {
+      return;
+    }
+
+    setAttemptedChoiceIds(checkedResult.selectedChoiceIds);
+    setSelectedChoiceId(null);
+    setCheckedResult(null);
+    setIsCurrentQuestionFinalized(false);
+  }
+
+  function handleExplainQuestion() {
+    if (!checkedResult || checkedResult.solved) {
+      return;
+    }
+
+    setAttemptedChoiceIds(checkedResult.selectedChoiceIds);
+    setIsCurrentQuestionFinalized(true);
   }
 
   function handleNextQuestion() {
     const storedResult = getQuestionResultAt(questionResults, currentIndex);
 
-    if (!checkedResult && !storedResult) {
+    if (!storedResult && (!checkedResult || !isCurrentQuestionFinalized)) {
       return;
     }
 
@@ -157,7 +241,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   function handleBackQuestion() {
     const storedResult = getQuestionResultAt(questionResults, currentIndex);
     const nextQuestionResults =
-      !storedResult && checkedResult
+      !storedResult && checkedResult && isCurrentQuestionFinalized
         ? upsertQuestionResult(questionResults, currentIndex, checkedResult)
         : questionResults;
 
@@ -167,8 +251,6 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 
     if (currentIndex === 0) {
       setCurrentIndex(0);
-      setSelectedChoiceId(null);
-      setCheckedResult(null);
       setMode("home");
       return;
     }
@@ -198,29 +280,53 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   function moveToQuestion(index: number, results: QuestionResult[]) {
     setCurrentIndex(index);
     setSelectedChoiceId(null);
+    setAttemptedChoiceIds([]);
     setCheckedResult(null);
+    setIsCurrentQuestionFinalized(false);
 
     if (!getQuestionResultAt(results, index)) {
       setQuestionStart(performance.now());
     }
   }
 
-  function handleScoreContinue() {
-    if (!currentResult) {
+  async function handleScoreContinue() {
+    if (!currentResult || isSavingResult) {
       return;
     }
 
-    saveDailyResult(currentResult, activeStorage);
-    const nextHistory = getStudentHistory(currentResult.studentName, activeStorage);
-    setHistory(nextHistory);
-    setMode("streak");
+    setIsSavingResult(true);
+
+    try {
+      let savedResult = currentResult;
+      saveDailyResult(savedResult, activeStorage);
+
+      if (shouldUseRemoteResults) {
+        try {
+          savedResult = await saveRemoteDailyResult(currentResult);
+          saveDailyResult(savedResult, activeStorage);
+        } catch {
+          savedResult = currentResult;
+        }
+      }
+
+      const nextHistory = shouldUseRemoteResults
+        ? await loadRemoteHistoryWithLocalFallback(savedResult.studentName, activeStorage)
+        : getStudentHistory(savedResult.studentName, activeStorage);
+      setHistory(nextHistory);
+      setHomeHistory(nextHistory);
+      setMode("streak");
+    } finally {
+      setIsSavingResult(false);
+    }
   }
 
   function handleStreakContinue() {
     setCurrentResult(null);
     setQuestionResults([]);
     setSelectedChoiceId(null);
+    setAttemptedChoiceIds([]);
     setCheckedResult(null);
+    setIsCurrentQuestionFinalized(false);
     setMode("home");
   }
 
@@ -230,6 +336,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
         <HomeScreen
           dateKey={dateKey}
           nameInput={nameInput}
+          isStarting={isStarting}
           onNameChange={setNameInput}
           onSubmit={handleStart}
           streak={homeStreak}
@@ -238,12 +345,16 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 
       {mode === "quiz" || mode === "review" ? (
         <QuestionScreen
+          attemptedChoiceIds={attemptedChoiceIds}
           currentIndex={currentIndex}
+          isCurrentQuestionFinalized={isCurrentQuestionFinalized}
           isReview={mode === "review"}
           onBack={mode === "review" ? handleBackReviewQuestion : handleBackQuestion}
           onCheck={handleCheck}
+          onExplain={handleExplainQuestion}
           onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
           onSelectChoice={setSelectedChoiceId}
+          onTryAgain={handleTryAgain}
           problem={currentProblem}
           questionStart={questionStart}
           result={checkedResult}
@@ -255,7 +366,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       ) : null}
 
       {mode === "score" && currentResult ? (
-        <ScoreScreen onContinue={handleScoreContinue} result={currentResult} />
+        <ScoreScreen isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
       ) : null}
 
       {mode === "streak" ? (
@@ -267,24 +378,26 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 
 type HomeScreenProps = {
   dateKey: string;
+  isStarting: boolean;
   nameInput: string;
   onNameChange(name: string): void;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   streak: number;
 };
 
-function HomeScreen({ dateKey, nameInput, onNameChange, onSubmit, streak }: HomeScreenProps) {
+function HomeScreen({ dateKey, isStarting, nameInput, onNameChange, onSubmit, streak }: HomeScreenProps) {
   return (
     <section className="app-card home-card" aria-label="Three Qs home">
-      <div className="home-logo-wrap" aria-hidden="true">
-        <img alt="" className="home-logo" src={threeQsLogo.src} />
-      </div>
+      <div className="home-top-spacer" aria-hidden="true" />
 
       <div className="home-copy">
-        <p className="today-label">{formatDateKey(dateKey)}</p>
         <h1>Three Qs</h1>
         <p>Your daily math superbowl challenge</p>
       </div>
+
+      <div className="home-spacer" aria-hidden="true" />
+
+      <p className="today-label home-date">{formatDateKey(dateKey)}</p>
 
       <div className="streak-pill" aria-label={`${streak} day streak`}>
         <span className="streak-icon">
@@ -296,9 +409,11 @@ function HomeScreen({ dateKey, nameInput, onNameChange, onSubmit, streak }: Home
         </span>
       </div>
 
+      <div className="home-spacer compact" aria-hidden="true" />
+
       <form className="home-form" onSubmit={onSubmit}>
         <label className="input-label">
-          <span>Your name</span>
+          <span>Your Name</span>
           <input
             className="name-input"
             name="studentName"
@@ -308,7 +423,11 @@ function HomeScreen({ dateKey, nameInput, onNameChange, onSubmit, streak }: Home
           />
         </label>
 
-        <button className="primary-action" disabled={!normalizeStudentName(nameInput)} type="submit">
+        <button
+          className="primary-action home-play-action"
+          disabled={!normalizeStudentName(nameInput) || isStarting}
+          type="submit"
+        >
           <Play size={19} fill="currentColor" />
           Play
         </button>
@@ -318,12 +437,16 @@ function HomeScreen({ dateKey, nameInput, onNameChange, onSubmit, streak }: Home
 }
 
 type QuestionScreenProps = {
+  attemptedChoiceIds: string[];
   currentIndex: number;
+  isCurrentQuestionFinalized: boolean;
   isReview: boolean;
   onBack(): void;
   onCheck(): void;
+  onExplain(): void;
   onNext(): void;
   onSelectChoice(choiceId: string): void;
+  onTryAgain(): void;
   problem: Problem;
   questionStart: number;
   result: QuestionResult | null;
@@ -334,12 +457,16 @@ type QuestionScreenProps = {
 };
 
 function QuestionScreen({
+  attemptedChoiceIds,
   currentIndex,
+  isCurrentQuestionFinalized,
   isReview,
   onBack,
   onCheck,
+  onExplain,
   onNext,
   onSelectChoice,
+  onTryAgain,
   problem,
   questionStart,
   result,
@@ -349,10 +476,22 @@ function QuestionScreen({
   totalQuestions
 }: QuestionScreenProps) {
   const displayResult = isReview ? reviewResult : savedResult ?? result;
+  const displayAttemptedChoiceIds = isReview
+    ? reviewResult?.selectedChoiceIds ?? []
+    : savedResult?.selectedChoiceIds ?? displayResult?.selectedChoiceIds ?? attemptedChoiceIds;
   const displaySelectedChoiceId = isReview
     ? reviewResult?.selectedChoiceIds.at(-1) ?? null
     : savedResult?.selectedChoiceIds.at(-1) ?? selectedChoiceId;
   const isViewingSavedAnswer = Boolean(isReview || savedResult);
+  const displayIsFinalized = Boolean(isViewingSavedAnswer || isCurrentQuestionFinalized);
+  const canTryAgain = Boolean(
+    !isReview &&
+      !savedResult &&
+      displayResult &&
+      !displayResult.solved &&
+      !isCurrentQuestionFinalized &&
+      displayResult.attemptsUsed < MAX_ATTEMPTS
+  );
 
   return (
     <section className="app-card quiz-card" aria-label="Question screen">
@@ -391,22 +530,27 @@ function QuestionScreen({
         <div className="answer-grid">
           {problem.choices.map((choice) => {
             const isSelected = displaySelectedChoiceId === choice.id;
-            const isCorrect = Boolean(displayResult && choice.id === problem.correctChoiceId);
-            const isWrong = Boolean(displayResult && isSelected && choice.id !== problem.correctChoiceId);
+            const isAttemptedWrong =
+              displayAttemptedChoiceIds.includes(choice.id) && choice.id !== problem.correctChoiceId;
+            const shouldRevealCorrectChoice = Boolean(
+              displayResult &&
+                choice.id === problem.correctChoiceId &&
+                (displayResult.solved || (displayIsFinalized && displayResult.attemptsUsed < MAX_ATTEMPTS))
+            );
 
             return (
               <button
-                aria-pressed={isSelected}
+                aria-pressed={isSelected || displayAttemptedChoiceIds.includes(choice.id)}
                 className={[
                   "answer-button",
                   isSelected ? "selected" : "",
-                  isCorrect ? "correct" : "",
-                  isWrong ? "wrong" : ""
+                  shouldRevealCorrectChoice ? "correct" : "",
+                  isAttemptedWrong ? "wrong" : ""
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 data-testid={`choice-${choice.id}`}
-                disabled={Boolean(displayResult) || isReview}
+                disabled={Boolean(displayResult) || isReview || displayAttemptedChoiceIds.includes(choice.id)}
                 key={choice.id}
                 onClick={() => onSelectChoice(choice.id)}
                 type="button"
@@ -442,8 +586,12 @@ function QuestionScreen({
 
       {!isReview && !savedResult && result ? (
         <FeedbackSheet
+          canTryAgain={canTryAgain}
           isFinalQuestion={currentIndex + 1 === totalQuestions}
+          isFinalized={isCurrentQuestionFinalized}
+          onExplain={onExplain}
           onNext={onNext}
+          onTryAgain={onTryAgain}
           problem={problem}
           result={result}
         />
@@ -505,42 +653,71 @@ function getTimerDigitClass(seconds: number): "digits-1" | "digits-2" | "digits-
 }
 
 type FeedbackSheetProps = {
+  canTryAgain: boolean;
   isFinalQuestion: boolean;
+  isFinalized: boolean;
+  onExplain(): void;
   onNext(): void;
+  onTryAgain(): void;
   problem: Problem;
   result: QuestionResult;
 };
 
-function FeedbackSheet({ isFinalQuestion, onNext, problem, result }: FeedbackSheetProps) {
+function FeedbackSheet({
+  canTryAgain,
+  isFinalQuestion,
+  isFinalized,
+  onExplain,
+  onNext,
+  onTryAgain,
+  problem,
+  result
+}: FeedbackSheetProps) {
+  const shouldShowExplanation = !result.solved && isFinalized;
+
   return (
     <div className={`feedback-sheet ${result.solved ? "correct" : "incorrect"}`} role="status">
       <div>
         <h2>{result.solved ? "Correct!" : "Not quite"}</h2>
         {result.solved ? (
           <p>
-            +{result.score} points in {toWholeSeconds(result.elapsedSeconds)} seconds.
+            {result.attemptPoints} pts + {result.speedBonus} speed pts
           </p>
-        ) : (
+        ) : shouldShowExplanation ? (
           <p>
             <MathText text={problem.explanation} />
           </p>
+        ) : (
+          <p>Try one more answer, or see how to solve it.</p>
         )}
       </div>
 
-      <button className="sheet-next" onClick={onNext} type="button">
-        {isFinalQuestion ? "Next" : "Next"}
-        <ArrowRight size={18} />
-      </button>
+      {canTryAgain ? (
+        <div className="feedback-actions">
+          <button className="sheet-secondary" onClick={onExplain} type="button">
+            Explain it
+          </button>
+          <button className="sheet-next" onClick={onTryAgain} type="button">
+            Try again
+          </button>
+        </div>
+      ) : (
+        <button className="sheet-next" onClick={onNext} type="button">
+          {isFinalQuestion ? "Next" : "Next"}
+          <ArrowRight size={18} />
+        </button>
+      )}
     </div>
   );
 }
 
 type ScoreScreenProps = {
+  isSaving: boolean;
   onContinue(): void;
   result: DailyResult;
 };
 
-function ScoreScreen({ onContinue, result }: ScoreScreenProps) {
+function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
   const solvedCount = result.questionResults.filter((entry) => entry.solved).length;
   const medalLabel = getMedalLabel(result.medal);
 
@@ -569,7 +746,7 @@ function ScoreScreen({ onContinue, result }: ScoreScreenProps) {
         </div>
       </div>
 
-      <button className="primary-action" onClick={onContinue} type="button">
+      <button className="primary-action" disabled={isSaving} onClick={onContinue} type="button">
         Continue
       </button>
     </section>
@@ -641,4 +818,19 @@ function getCompleteQuestionResults(results: QuestionResult[], totalQuestions: n
   }
 
   return completeResults;
+}
+
+async function loadRemoteHistoryWithLocalFallback(
+  studentName: string,
+  storage: StorageLike | undefined
+): Promise<DailyResult[]> {
+  const localHistory = getStudentHistory(studentName, storage);
+
+  try {
+    const remoteHistory = await fetchRemoteHistory(studentName);
+    replaceStudentHistory(studentName, remoteHistory, storage);
+    return remoteHistory;
+  } catch {
+    return localHistory;
+  }
 }
