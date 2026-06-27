@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Medal, Pencil, Play, Trophy } from "lucide-react";
-import { FormEvent, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
@@ -57,7 +57,8 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   const [homeHistory, setHomeHistory] = useState<DailyResult[]>([]);
   const [currentResult, setCurrentResult] = useState<DailyResult | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [questionStart, setQuestionStart] = useState(() => performance.now());
+  const [questionTimer, setQuestionTimer] = useState<QuestionTimer>(() => pausedTimer(0));
+  const questionTimerRef = useRef(questionTimer);
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [attemptedChoiceIds, setAttemptedChoiceIds] = useState<string[]>([]);
   const [checkedResult, setCheckedResult] = useState<QuestionResult | null>(null);
@@ -83,6 +84,13 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     },
     [onRouteChange]
   );
+
+  // Keep a ref alongside the timer state so effect cleanups and event handlers
+  // can read the live timer (the state closure would be stale).
+  const updateTimer = useCallback((next: QuestionTimer) => {
+    questionTimerRef.current = next;
+    setQuestionTimer(next);
+  }, []);
 
   useEffect(() => {
     setHasLoadedProfile(false);
@@ -240,10 +248,52 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     isCurrentQuestionFinalized,
     mode,
     questionResults,
-    questionStart,
+    questionTimer,
     selectedChoiceId,
     studentName
   ]);
+
+  // The clock runs while the active (still-unanswered) question is on screen —
+  // including while reading "try again" feedback, since that's the same screen.
+  // Leaving the screen — navigating away, unmounting, or hiding the tab —
+  // pauses it; returning resumes from the same elapsed time. Once the question
+  // is answered the recorded time is frozen, so the running clock is moot.
+  useEffect(() => {
+    const isOnActiveQuestion =
+      mode === "quiz" && !getQuestionResultAt(questionResults, currentIndex);
+
+    if (!isOnActiveQuestion) {
+      return undefined;
+    }
+
+    if (typeof document === "undefined" || document.visibilityState !== "hidden") {
+      updateTimer(resumeTimer(questionTimerRef.current));
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // Persist eagerly: the tab may be frozen before React flushes the
+        // draft-save effect. No navigation has happened, so closures are fresh.
+        const paused = pauseTimer(questionTimerRef.current);
+        updateTimer(paused);
+        saveDraftSnapshot({ questionElapsedMs: Math.round(paused.elapsedMs) });
+      } else {
+        updateTimer(resumeTimer(questionTimerRef.current));
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      // Freeze the timer on the way out. The draft-save effect re-persists the
+      // paused elapsed with the post-navigation state, so we don't write here.
+      updateTimer(pauseTimer(questionTimerRef.current));
+    };
+    // saveDraftSnapshot is intentionally omitted from deps: it is recreated
+    // every render and always reads the latest values via closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, mode, questionResults, updateTimer]);
 
   function forceHome() {
     setCurrentIndex(0);
@@ -262,7 +312,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
-    setQuestionStart(performance.now());
+    updateTimer(pausedTimer(0));
 
     if (targetRoute.screen === "question") {
       setCurrentIndex(targetRoute.questionIndex);
@@ -308,7 +358,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
-    setQuestionStart(performance.now());
+    updateTimer(pausedTimer(0));
     setMode("score");
   }
 
@@ -331,7 +381,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
       setAttemptedChoiceIds([]);
       setCheckedResult(null);
       setIsCurrentQuestionFinalized(false);
-      setQuestionStart(performance.now());
+      updateTimer(pausedTimer(0));
       setMode("quiz");
       return;
     }
@@ -359,11 +409,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     setIsCurrentQuestionFinalized(
       shouldRestoreActiveQuestion ? draft.isCurrentQuestionFinalized : false
     );
-    setQuestionStart(
-      shouldRestoreActiveQuestion
-        ? getRestoredQuestionStart(draft.questionStartedAtMs)
-        : performance.now()
-    );
+    updateTimer(pausedTimer(shouldRestoreActiveQuestion ? draft.questionElapsedMs : 0));
     setMode("quiz");
   }
 
@@ -382,7 +428,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
         attemptedChoiceIds,
         checkedResult,
         isCurrentQuestionFinalized,
-        questionStartedAtMs: getQuestionStartedAtMs(questionStart),
+        questionElapsedMs: Math.round(getTimerElapsedMs(questionTimerRef.current)),
         ...overrides
       },
       activeStorage
@@ -465,12 +511,11 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }
 
   function startQuestion() {
-    const start = performance.now();
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
-    setQuestionStart(start);
+    updateTimer(pausedTimer(0));
   }
 
   function handleCheck() {
@@ -478,8 +523,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
       return;
     }
 
-    const answeredAt = performance.now();
-    const exactElapsedSeconds = Math.max(0, (answeredAt - questionStart) / 1000);
+    const exactElapsedSeconds = getTimerElapsedMs(questionTimerRef.current) / 1000;
     const nextSelectedChoiceIds = [...attemptedChoiceIds, selectedChoiceId];
     const solved = selectedChoiceId === currentProblem.correctChoiceId;
     const nextResult = scoreQuestion({
@@ -534,6 +578,15 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
 
     if (currentIndex < dailyProblems.length - 1) {
       const nextIndex = currentIndex + 1;
+      // Advancing past the question we just answered starts a fresh clock;
+      // stepping forward through already-answered questions keeps the running
+      // question's elapsed time so it resumes where it paused.
+      const isStartingNewQuestion = !storedResult && !getQuestionResultAt(nextQuestionResults, nextIndex);
+
+      if (isStartingNewQuestion) {
+        updateTimer(pausedTimer(0));
+      }
+
       saveDraftSnapshot({
         currentIndex: nextIndex,
         questionResults: nextQuestionResults,
@@ -541,7 +594,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
         attemptedChoiceIds: [],
         checkedResult: null,
         isCurrentQuestionFinalized: false,
-        questionStartedAtMs: Date.now()
+        ...(isStartingNewQuestion ? { questionElapsedMs: 0 } : {})
       });
       moveToQuestion(nextIndex, nextQuestionResults);
       navigateTo({ screen: "question", questionIndex: nextIndex });
@@ -627,16 +680,15 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     navigateTo({ screen: "question", questionIndex: previousIndex });
   }
 
-  function moveToQuestion(index: number, results: QuestionResult[]) {
+  function moveToQuestion(index: number, _results: QuestionResult[]) {
+    // The timer effect resumes (or, for a freshly started question, runs from
+    // zero) once the new index lands on screen, so navigation only resets the
+    // per-question answer state here.
     setCurrentIndex(index);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
-
-    if (!getQuestionResultAt(results, index)) {
-      setQuestionStart(performance.now());
-    }
   }
 
   async function handleScoreContinue() {
@@ -724,7 +776,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
           onSelectChoice={setSelectedChoiceId}
           onTryAgain={handleTryAgain}
           problem={currentProblem}
-          questionStart={questionStart}
+          questionTimer={questionTimer}
           result={checkedResult}
           reviewResult={mode === "review" ? currentResult?.questionResults[currentIndex] ?? null : null}
           savedResult={mode === "quiz" ? getQuestionResultAt(questionResults, currentIndex) : null}
@@ -910,7 +962,7 @@ type QuestionScreenProps = {
   onSelectChoice(choiceId: string): void;
   onTryAgain(): void;
   problem: Problem;
-  questionStart: number;
+  questionTimer: QuestionTimer;
   result: QuestionResult | null;
   reviewResult: QuestionResult | null;
   savedResult: QuestionResult | null;
@@ -930,7 +982,7 @@ function QuestionScreen({
   onSelectChoice,
   onTryAgain,
   problem,
-  questionStart,
+  questionTimer,
   result,
   reviewResult,
   savedResult,
@@ -985,9 +1037,9 @@ function QuestionScreen({
         </div>
 
         <TimerPill
-          key={`${currentIndex}-${questionStart}`}
+          key={currentIndex}
           frozenSeconds={displayResult?.elapsedSeconds}
-          startedAt={questionStart}
+          timer={questionTimer}
         />
       </header>
 
@@ -1071,28 +1123,29 @@ function QuestionScreen({
 
 const TimerPill = memo(function TimerPill({
   frozenSeconds,
-  startedAt
+  timer
 }: {
   frozenSeconds?: number;
-  startedAt: number;
+  timer: QuestionTimer;
 }) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(() => getElapsedSeconds(startedAt));
-  const displaySeconds = toWholeSeconds(frozenSeconds ?? elapsedSeconds);
+  const [liveElapsedMs, setLiveElapsedMs] = useState(() => getTimerElapsedMs(timer));
+  const isRunning = frozenSeconds === undefined && timer.runningSince !== null;
+  const displaySeconds = toWholeSeconds(
+    frozenSeconds !== undefined ? frozenSeconds : liveElapsedMs / 1000
+  );
   const timerText = formatElapsedSeconds(displaySeconds);
   const digitClass = getTimerDigitClass(displaySeconds);
 
   useEffect(() => {
-    if (frozenSeconds !== undefined) {
-      setElapsedSeconds(frozenSeconds);
+    setLiveElapsedMs(getTimerElapsedMs(timer));
+
+    if (!isRunning) {
       return undefined;
     }
 
-    const updateElapsed = () => setElapsedSeconds(getElapsedSeconds(startedAt));
-    updateElapsed();
-
-    const interval = window.setInterval(updateElapsed, 200);
+    const interval = window.setInterval(() => setLiveElapsedMs(getTimerElapsedMs(timer)), 200);
     return () => window.clearInterval(interval);
-  }, [frozenSeconds, startedAt]);
+  }, [isRunning, timer]);
 
   return (
     <div className={`timer-pill ${digitClass}`} aria-label={`${displaySeconds} seconds elapsed`}>
@@ -1101,10 +1154,6 @@ const TimerPill = memo(function TimerPill({
     </div>
   );
 });
-
-function getElapsedSeconds(startedAt: number): number {
-  return Math.max(0, (performance.now() - startedAt) / 1000);
-}
 
 function toWholeSeconds(seconds: number): number {
   return Math.max(0, Math.floor(seconds));
@@ -1283,12 +1332,37 @@ function clampQuestionIndex(index: number, totalQuestions: number): number {
   return Math.min(Math.max(0, Math.floor(index)), totalQuestions - 1);
 }
 
-function getQuestionStartedAtMs(questionStart: number): number {
-  return Date.now() - Math.max(0, performance.now() - questionStart);
+// A pause-aware stopwatch for the active question. `elapsedMs` is the time
+// banked from prior running segments; `runningSince` is the performance.now()
+// mark of the current segment, or null while paused.
+type QuestionTimer = {
+  elapsedMs: number;
+  runningSince: number | null;
+};
+
+function pausedTimer(elapsedMs = 0): QuestionTimer {
+  return { elapsedMs: Math.max(0, elapsedMs), runningSince: null };
 }
 
-function getRestoredQuestionStart(questionStartedAtMs: number): number {
-  return performance.now() - Math.max(0, Date.now() - questionStartedAtMs);
+function getTimerElapsedMs(timer: QuestionTimer): number {
+  const runningMs = timer.runningSince === null ? 0 : Math.max(0, performance.now() - timer.runningSince);
+  return Math.max(0, timer.elapsedMs) + runningMs;
+}
+
+function resumeTimer(timer: QuestionTimer): QuestionTimer {
+  if (timer.runningSince !== null) {
+    return timer;
+  }
+
+  return { elapsedMs: Math.max(0, timer.elapsedMs), runningSince: performance.now() };
+}
+
+function pauseTimer(timer: QuestionTimer): QuestionTimer {
+  if (timer.runningSince === null) {
+    return timer;
+  }
+
+  return { elapsedMs: getTimerElapsedMs(timer), runningSince: null };
 }
 
 function upsertQuestionResult(

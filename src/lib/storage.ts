@@ -30,7 +30,7 @@ export type DailyDraft = {
   attemptedChoiceIds: string[];
   checkedResult: QuestionResult | null;
   isCurrentQuestionFinalized: boolean;
-  questionStartedAtMs: number;
+  questionElapsedMs: number;
 };
 
 type StoredDailyDraft = Omit<DailyDraft, "questionResults"> & {
@@ -168,10 +168,10 @@ export function getDailyDraft(
         : [],
       checkedResult: isQuestionResult(parsed.checkedResult) ? parsed.checkedResult : null,
       isCurrentQuestionFinalized: Boolean(parsed.isCurrentQuestionFinalized),
-      questionStartedAtMs:
-        typeof parsed.questionStartedAtMs === "number" && Number.isFinite(parsed.questionStartedAtMs)
-          ? parsed.questionStartedAtMs
-          : Date.now()
+      questionElapsedMs:
+        typeof parsed.questionElapsedMs === "number" && Number.isFinite(parsed.questionElapsedMs)
+          ? Math.max(0, parsed.questionElapsedMs)
+          : 0
     };
   } catch {
     return null;
@@ -200,9 +200,10 @@ export function saveDailyDraft(draft: DailyDraft, storage = getBrowserStorage())
       attemptedChoiceIds: draft.attemptedChoiceIds,
       checkedResult: draft.checkedResult,
       isCurrentQuestionFinalized: draft.isCurrentQuestionFinalized,
-      questionStartedAtMs: Number.isFinite(draft.questionStartedAtMs)
-        ? draft.questionStartedAtMs
-        : Date.now(),
+      questionElapsedMs:
+        Number.isFinite(draft.questionElapsedMs) && draft.questionElapsedMs > 0
+          ? draft.questionElapsedMs
+          : 0,
       updatedAt: new Date().toISOString()
     } satisfies StoredDailyDraft)
   );
