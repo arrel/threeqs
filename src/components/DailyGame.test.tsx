@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DailyGame } from "@/components/DailyGame";
@@ -126,6 +126,61 @@ describe("DailyGame", () => {
     expect(screen.getByTestId(`choice-${wrongChoiceId}`)).toHaveClass("wrong");
     expect(screen.getByTestId(`choice-${problem.correctChoiceId}`)).toHaveClass("correct");
     expect(getButtonByText(/^next$/i)).toBeInTheDocument();
+  });
+
+  it("opens vocabulary help from underlined prompt words and the topbar help button", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-27T18:00:00Z");
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+
+    await user.click(screen.getAllByRole("button", { name: /show definition for mean/i })[0]);
+
+    const vocabDialog = screen.getByRole("dialog", { name: /words to know/i });
+    expect(vocabDialog).toBeInTheDocument();
+    expect(within(vocabDialog).queryByText(/^Vocabulary$/i)).not.toBeInTheDocument();
+    expect(within(vocabDialog).getByText(/^Mean$/i)).toBeInTheDocument();
+    expect(within(vocabDialog).getByText(/add all the values/i)).toBeInTheDocument();
+
+    fireEvent.pointerDown(screen.getByTestId("vocab-backdrop"));
+
+    expect(screen.getByTestId("vocab-sheet")).toHaveClass("closing");
+    finishVocabDismissal();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /words to know/i })).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByLabelText(/open vocabulary help/i));
+
+    expect(screen.getByRole("dialog", { name: /words to know/i })).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/close vocabulary help/i));
+
+    expect(screen.getByTestId("vocab-sheet")).toHaveClass("closing");
+    finishVocabDismissal();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /words to know/i })).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByLabelText(/open vocabulary help/i));
+
+    const swipeSheet = screen.getByTestId("vocab-sheet");
+    fireEvent.pointerDown(swipeSheet, { clientY: 120, pointerType: "touch" });
+    fireEvent.pointerMove(swipeSheet, { clientY: 210, pointerType: "touch" });
+    fireEvent.pointerUp(swipeSheet, { clientY: 210, pointerType: "touch" });
+
+    expect(screen.getByTestId("vocab-sheet")).toHaveClass("closing");
+    finishVocabDismissal();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /words to know/i })).not.toBeInTheDocument();
+    });
   });
 
   it("shows the explanation and two red answers after two misses", async () => {
@@ -443,6 +498,14 @@ function getButtonByText(text: RegExp): HTMLButtonElement {
   }
 
   return button;
+}
+
+function finishVocabDismissal() {
+  const event = new Event("animationend", { bubbles: true });
+  Object.defineProperty(event, "animationName", {
+    value: "vocab-sheet-slide-down"
+  });
+  fireEvent(screen.getByTestId("vocab-sheet"), event);
 }
 
 function createMemoryStorage(): StorageLike {
