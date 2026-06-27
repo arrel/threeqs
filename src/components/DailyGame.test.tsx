@@ -177,6 +177,144 @@ describe("DailyGame", () => {
     expect(screen.queryByText(/^check$/i)).not.toBeInTheDocument();
   });
 
+  it("redirects protected routes home when no student is saved", async () => {
+    const routeChange = vi.fn();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+
+    render(
+      <DailyGame
+        onRouteChange={routeChange}
+        route={{ screen: "question", questionIndex: 0 }}
+        storage={storage}
+        today={today}
+      />
+    );
+
+    await waitFor(() => {
+      expect(routeChange).toHaveBeenCalledWith({ screen: "home" }, "replace");
+    });
+  });
+
+  it("redirects skip-ahead question routes home instead of to the next allowed question", async () => {
+    const routeChange = vi.fn();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    saveStudentName("Ada", storage);
+
+    render(
+      <DailyGame
+        onRouteChange={routeChange}
+        route={{ screen: "question", questionIndex: 1 }}
+        storage={storage}
+        today={today}
+      />
+    );
+
+    await waitFor(() => {
+      expect(routeChange).toHaveBeenCalledWith({ screen: "home" }, "replace");
+    });
+  });
+
+  it("reloads a valid in-progress question route from the saved draft", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const [firstProblem] = selectDailyProblems(problems, dateKey);
+
+    const { unmount } = render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+    await user.click(screen.getByTestId(`choice-${firstProblem.correctChoiceId}`));
+    await user.click(getButtonByText(/^check$/i));
+    await user.click(getButtonByText(/^next$/i));
+    expect(screen.getByLabelText(/Question 2 of 3/i)).toBeInTheDocument();
+
+    unmount();
+
+    const routeChange = vi.fn();
+    render(
+      <DailyGame
+        onRouteChange={routeChange}
+        route={{ screen: "question", questionIndex: 1 }}
+        storage={storage}
+        today={today}
+      />
+    );
+
+    expect(await screen.findByLabelText(/Question 2 of 3/i)).toBeInTheDocument();
+    expect(routeChange).not.toHaveBeenCalledWith({ screen: "home" }, "replace");
+  });
+
+  it("redirects the results route home until all questions are answered", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const [firstProblem] = selectDailyProblems(problems, dateKey);
+
+    const { unmount } = render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+    await user.click(screen.getByTestId(`choice-${firstProblem.correctChoiceId}`));
+    await user.click(getButtonByText(/^check$/i));
+    await user.click(getButtonByText(/^next$/i));
+
+    unmount();
+
+    const routeChange = vi.fn();
+    render(
+      <DailyGame
+        onRouteChange={routeChange}
+        route={{ screen: "results" }}
+        storage={storage}
+        today={today}
+      />
+    );
+
+    await waitFor(() => {
+      expect(routeChange).toHaveBeenCalledWith({ screen: "home" }, "replace");
+    });
+  });
+
+  it("reloads the results route from a complete unsaved draft", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const dailyProblems = selectDailyProblems(problems, dateKey);
+
+    const { unmount } = render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+
+    for (const problem of dailyProblems) {
+      await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
+      await user.click(getButtonByText(/^check$/i));
+      await user.click(getButtonByText(/^next$/i));
+    }
+
+    expect(screen.getByText(/challenge complete/i)).toBeInTheDocument();
+    unmount();
+
+    const routeChange = vi.fn();
+    render(
+      <DailyGame
+        onRouteChange={routeChange}
+        route={{ screen: "results" }}
+        storage={storage}
+        today={today}
+      />
+    );
+
+    expect(await screen.findByText(/challenge complete/i)).toBeInTheDocument();
+    expect(routeChange).not.toHaveBeenCalledWith({ screen: "home" }, "replace");
+  });
+
   it("refreshes the remote leaderboard each time the home screen loads", async () => {
     const user = userEvent.setup();
     const today = new Date("2026-06-24T18:00:00Z");
