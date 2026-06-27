@@ -1,8 +1,9 @@
 import { previousDateKey } from "@/lib/date";
-import type { DailyResult } from "@/lib/types";
+import type { DailyResult, QuestionResult } from "@/lib/types";
 
 const STORAGE_KEY = "msb-daily-results-v1";
 const PROFILE_KEY = "three-qs-profile-v1";
+const DRAFT_KEY = "three-qs-daily-draft-v1";
 
 export type StorageLike = {
   getItem(key: string): string | null;
@@ -18,6 +19,24 @@ type StoredPayload = {
 type StoredProfile = {
   version: 1;
   studentName: string;
+};
+
+export type DailyDraft = {
+  dateKey: string;
+  studentName: string;
+  currentIndex: number;
+  questionResults: QuestionResult[];
+  selectedChoiceId: string | null;
+  attemptedChoiceIds: string[];
+  checkedResult: QuestionResult | null;
+  isCurrentQuestionFinalized: boolean;
+  questionStartedAtMs: number;
+};
+
+type StoredDailyDraft = Omit<DailyDraft, "questionResults"> & {
+  version: 1;
+  questionResults: Record<string, QuestionResult>;
+  updatedAt: string;
 };
 
 function emptyPayload(): StoredPayload {
@@ -113,6 +132,99 @@ export function saveStudentName(name: string, storage = getBrowserStorage()): vo
   );
 }
 
+export function getDailyDraft(
+  name: string,
+  dateKey: string,
+  storage = getBrowserStorage()
+): DailyDraft | null {
+  if (!storage) {
+    return null;
+  }
+
+  const raw = storage.getItem(DRAFT_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as StoredDailyDraft;
+
+    if (
+      parsed.version !== 1 ||
+      parsed.dateKey !== dateKey ||
+      getStudentKey(parsed.studentName) !== getStudentKey(name)
+    ) {
+      return null;
+    }
+
+    return {
+      dateKey: parsed.dateKey,
+      studentName: normalizeStudentName(parsed.studentName),
+      currentIndex: Math.max(0, Math.floor(parsed.currentIndex)),
+      questionResults: decodeQuestionResults(parsed.questionResults),
+      selectedChoiceId: typeof parsed.selectedChoiceId === "string" ? parsed.selectedChoiceId : null,
+      attemptedChoiceIds: Array.isArray(parsed.attemptedChoiceIds)
+        ? parsed.attemptedChoiceIds.filter((choiceId): choiceId is string => typeof choiceId === "string")
+        : [],
+      checkedResult: isQuestionResult(parsed.checkedResult) ? parsed.checkedResult : null,
+      isCurrentQuestionFinalized: Boolean(parsed.isCurrentQuestionFinalized),
+      questionStartedAtMs:
+        typeof parsed.questionStartedAtMs === "number" && Number.isFinite(parsed.questionStartedAtMs)
+          ? parsed.questionStartedAtMs
+          : Date.now()
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveDailyDraft(draft: DailyDraft, storage = getBrowserStorage()): void {
+  if (!storage) {
+    return;
+  }
+
+  const studentName = normalizeStudentName(draft.studentName);
+  if (!studentName || !draft.dateKey) {
+    return;
+  }
+
+  storage.setItem(
+    DRAFT_KEY,
+    JSON.stringify({
+      version: 1,
+      dateKey: draft.dateKey,
+      studentName,
+      currentIndex: Math.max(0, Math.floor(draft.currentIndex)),
+      questionResults: encodeQuestionResults(draft.questionResults),
+      selectedChoiceId: draft.selectedChoiceId,
+      attemptedChoiceIds: draft.attemptedChoiceIds,
+      checkedResult: draft.checkedResult,
+      isCurrentQuestionFinalized: draft.isCurrentQuestionFinalized,
+      questionStartedAtMs: Number.isFinite(draft.questionStartedAtMs)
+        ? draft.questionStartedAtMs
+        : Date.now(),
+      updatedAt: new Date().toISOString()
+    } satisfies StoredDailyDraft)
+  );
+}
+
+export function clearDailyDraft(
+  name: string,
+  dateKey: string,
+  storage = getBrowserStorage()
+): void {
+  if (!storage || !getDailyDraft(name, dateKey, storage)) {
+    return;
+  }
+
+  if (storage.removeItem) {
+    storage.removeItem(DRAFT_KEY);
+    return;
+  }
+
+  storage.setItem(DRAFT_KEY, "");
+}
+
 export function getStudentHistory(name: string, storage = getBrowserStorage()): DailyResult[] {
   const key = getStudentKey(name);
   if (!key) {
@@ -175,4 +287,49 @@ export function calculateCurrentStreak(results: DailyResult[], todayKey: string)
   }
 
   return streak;
+}
+
+function encodeQuestionResults(results: QuestionResult[]): Record<string, QuestionResult> {
+  return results.reduce<Record<string, QuestionResult>>((encoded, result, index) => {
+    if (isQuestionResult(result)) {
+      encoded[index] = result;
+    }
+
+    return encoded;
+  }, {});
+}
+
+function decodeQuestionResults(results: Record<string, QuestionResult>): QuestionResult[] {
+  if (!results || typeof results !== "object") {
+    return [];
+  }
+
+  return Object.entries(results).reduce<QuestionResult[]>((decoded, [key, result]) => {
+    const index = Number(key);
+
+    if (Number.isInteger(index) && index >= 0 && isQuestionResult(result)) {
+      decoded[index] = result;
+    }
+
+    return decoded;
+  }, []);
+}
+
+function isQuestionResult(value: unknown): value is QuestionResult {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const result = value as Partial<QuestionResult>;
+  return (
+    typeof result.problemId === "string" &&
+    typeof result.correctChoiceId === "string" &&
+    Array.isArray(result.selectedChoiceIds) &&
+    typeof result.attemptsUsed === "number" &&
+    typeof result.solved === "boolean" &&
+    typeof result.elapsedSeconds === "number" &&
+    typeof result.attemptPoints === "number" &&
+    typeof result.speedBonus === "number" &&
+    typeof result.score === "number"
+  );
 }
