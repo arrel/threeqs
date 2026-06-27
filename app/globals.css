@@ -497,8 +497,9 @@ button:disabled {
   width: 74px;
 }
 
-.timer-pill.digits-3 {
-  width: 84px;
+.timer-pill.minutes {
+  width: auto;
+  min-width: 106px;
 }
 
 .quiz-content {
