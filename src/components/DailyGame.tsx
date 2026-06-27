@@ -111,11 +111,24 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   }, [activeStorage, shouldUseRemoteResults, trimmedInput]);
 
   useEffect(() => {
-    if (!shouldUseRemoteResults) return;
+    if (!shouldUseRemoteResults || mode !== "home") {
+      return undefined;
+    }
+
+    let isCanceled = false;
+
     fetchLeaderboard()
-      .then(setLeaderboard)
+      .then((entries) => {
+        if (!isCanceled) {
+          setLeaderboard(entries);
+        }
+      })
       .catch(() => {});
-  }, [shouldUseRemoteResults]);
+
+    return () => {
+      isCanceled = true;
+    };
+  }, [mode, shouldUseRemoteResults]);
 
   async function handleStart(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
