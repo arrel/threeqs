@@ -283,6 +283,10 @@ describe("DailyGame", () => {
 
     render(<DailyGame today={today} />);
 
+    expect(screen.getByText("Your Name")).toBeInTheDocument();
+    expect(await screen.findByText("Ada", { selector: ".name-display-text" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Edit name")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Name loading")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Streak loading")).toBeInTheDocument();
     expect(screen.queryByLabelText("0 day streak")).not.toBeInTheDocument();
 

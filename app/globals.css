@@ -375,20 +375,50 @@ button:disabled {
 
 @media (prefers-reduced-motion: reduce) {
   .leaderboard-skeleton-bar,
-  .streak-skeleton {
+  .streak-skeleton,
+  .name-skeleton-bar {
     animation: none;
   }
 }
 
-.name-display {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.home-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.name-field {
+  display: grid;
+  gap: 8px;
+  color: #4a463e;
+  font-weight: 600;
+}
+
+.name-field-label {
+  min-height: 1.25em;
+  padding-left: 6px;
+  font-size: 0.92rem;
+}
+
+.name-display,
+.name-loading,
+.name-input {
+  width: 100%;
   min-height: 58px;
   padding: 0 18px;
   border: 1.5px solid var(--line-strong);
   border-radius: 999px;
   background: #fffaf0;
+  color: var(--ink);
+  outline: none;
+  font-weight: 500;
+}
+
+.name-display,
+.name-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .name-display-text {
@@ -398,6 +428,16 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.name-skeleton-bar {
+  display: block;
+  width: 42%;
+  max-width: 132px;
+  height: 14px;
+  border-radius: 999px;
+  background: #eadcc6;
+  animation: leaderboard-skeleton-pulse 1.3s ease-in-out infinite;
 }
 
 .name-edit-btn {
@@ -416,36 +456,6 @@ button:disabled {
 
 .name-edit-btn:hover {
   background: var(--line);
-}
-
-.home-form {
-  display: grid;
-  gap: 14px;
-  margin-top: 2px;
-}
-
-.input-label {
-  display: grid;
-  gap: 8px;
-  color: #4a463e;
-  font-weight: 600;
-}
-
-.input-label span {
-  padding-left: 6px;
-  font-size: 0.92rem;
-}
-
-.name-input {
-  width: 100%;
-  min-height: 58px;
-  padding: 0 18px;
-  border: 1.5px solid var(--line-strong);
-  border-radius: 999px;
-  background: #fffaf0;
-  color: var(--ink);
-  outline: none;
-  font-weight: 500;
 }
 
 .name-input:focus {

@@ -57,6 +57,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   const [isStarting, setIsStarting] = useState(false);
   const [isSavingResult, setIsSavingResult] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(shouldUseRemoteResults);
   const [isHomeHistoryLoading, setIsHomeHistoryLoading] = useState(shouldUseRemoteResults);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -70,6 +71,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     const savedName = getSavedStudentName(activeStorage);
 
     if (!savedName) {
+      setIsProfileLoading(false);
       setIsHomeHistoryLoading(false);
       return;
     }
@@ -83,6 +85,8 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     if (!shouldUseRemoteResults) {
       setIsHomeHistoryLoading(false);
     }
+
+    setIsProfileLoading(false);
   }, [activeStorage, shouldUseRemoteResults]);
 
   useEffect(() => {
@@ -398,6 +402,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
           isEditingName={isEditingName}
           isHomeHistoryLoading={isHomeHistoryLoading}
           isLeaderboardLoading={isLeaderboardLoading}
+          isProfileLoading={isProfileLoading}
           isStarting={isStarting}
           leaderboard={leaderboard}
           nameInput={nameInput}
@@ -447,6 +452,7 @@ type HomeScreenProps = {
   isEditingName: boolean;
   isHomeHistoryLoading: boolean;
   isLeaderboardLoading: boolean;
+  isProfileLoading: boolean;
   isStarting: boolean;
   leaderboard: LeaderboardEntry[];
   nameInput: string;
@@ -462,6 +468,7 @@ function HomeScreen({
   isEditingName,
   isHomeHistoryLoading,
   isLeaderboardLoading,
+  isProfileLoading,
   isStarting,
   leaderboard,
   nameInput,
@@ -472,6 +479,7 @@ function HomeScreen({
   streak
 }: HomeScreenProps) {
   const showNameInput = !savedName || isEditingName;
+  const nameLabelId = "student-name-label";
 
   return (
     <section className="app-card home-card" aria-label="Three Qs home">
@@ -512,31 +520,38 @@ function HomeScreen({
       <div aria-hidden="true" />
 
       <form className="home-form" onSubmit={onSubmit}>
-        {showNameInput ? (
-          <label className="input-label">
-            <span>Your Name</span>
+        <div className="name-field">
+          <span className="name-field-label" id={nameLabelId}>
+            Your Name
+          </span>
+          {isProfileLoading ? (
+            <div aria-label="Name loading" className="name-loading" role="status">
+              <span aria-hidden="true" className="name-skeleton-bar" />
+            </div>
+          ) : showNameInput ? (
             <input
               autoFocus={isEditingName}
+              aria-labelledby={nameLabelId}
               className="name-input"
               name="studentName"
               onChange={(event) => onNameChange(event.target.value)}
               placeholder="Type your name"
               value={nameInput}
             />
-          </label>
-        ) : (
-          <div className="name-display">
-            <span className="name-display-text">{savedName}</span>
-            <button
-              aria-label="Edit name"
-              className="name-edit-btn"
-              onClick={onEditName}
-              type="button"
-            >
-              <Pencil size={15} />
-            </button>
-          </div>
-        )}
+          ) : (
+            <div aria-labelledby={nameLabelId} className="name-display">
+              <span className="name-display-text">{savedName}</span>
+              <button
+                aria-label="Edit name"
+                className="name-edit-btn"
+                onClick={onEditName}
+                type="button"
+              >
+                <Pencil size={15} />
+              </button>
+            </div>
+          )}
+        </div>
 
         <button
           className="primary-action home-play-action"
