@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DailyGame } from "@/components/DailyGame";
@@ -186,6 +186,7 @@ describe("DailyGame", () => {
       [{ studentName: "Riley", totalPoints: 210, gold: 0, silver: 1, bronze: 1 }],
       [{ studentName: "Ada", totalPoints: 390, gold: 1, silver: 0, bronze: 0 }]
     ];
+    const pendingLeaderboardResponses: Array<() => void> = [];
     let leaderboardRequests = 0;
 
     vi.stubGlobal(
@@ -197,7 +198,9 @@ describe("DailyGame", () => {
           const entries =
             leaderboardResponses[Math.min(leaderboardRequests, leaderboardResponses.length - 1)];
           leaderboardRequests += 1;
-          return jsonResponse({ entries });
+          return new Promise<Response>((resolve) => {
+            pendingLeaderboardResponses.push(() => resolve(jsonResponse({ entries })));
+          });
         }
 
         if (url.includes("/api/results") && init?.method === "POST") {
@@ -214,6 +217,11 @@ describe("DailyGame", () => {
     );
 
     render(<DailyGame today={today} />);
+
+    expect(screen.getByLabelText("Leaderboard loading")).toBeInTheDocument();
+    expect(screen.queryByText(/no scores yet this week/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(leaderboardRequests).toBe(1));
+    resolveNextLeaderboard(pendingLeaderboardResponses);
 
     expect(await screen.findByText("Riley")).toBeInTheDocument();
     expect(leaderboardRequests).toBe(1);
@@ -233,6 +241,11 @@ describe("DailyGame", () => {
     expect(leaderboardRequests).toBe(1);
 
     await user.click(getButtonByText(/^continue$/i));
+
+    expect(screen.getByLabelText("Leaderboard loading")).toBeInTheDocument();
+    expect(screen.queryByText(/no scores yet this week/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(leaderboardRequests).toBe(2));
+    resolveNextLeaderboard(pendingLeaderboardResponses);
 
     expect(await screen.findByText("Ada", { selector: ".leaderboard-name" })).toBeInTheDocument();
     expect(screen.queryByText("Riley", { selector: ".leaderboard-name" })).not.toBeInTheDocument();
@@ -272,4 +285,14 @@ function jsonResponse(payload: unknown): Response {
     },
     status: 200
   });
+}
+
+function resolveNextLeaderboard(pendingResponses: Array<() => void>): void {
+  const resolve = pendingResponses.shift();
+
+  if (!resolve) {
+    throw new Error("No pending leaderboard response to resolve.");
+  }
+
+  resolve();
 }

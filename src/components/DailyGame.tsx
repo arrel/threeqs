@@ -57,6 +57,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   const [isStarting, setIsStarting] = useState(false);
   const [isSavingResult, setIsSavingResult] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(shouldUseRemoteResults);
   const [isEditingName, setIsEditingName] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
@@ -116,6 +117,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     }
 
     let isCanceled = false;
+    setIsLeaderboardLoading(true);
 
     fetchLeaderboard()
       .then((entries) => {
@@ -123,7 +125,12 @@ export function DailyGame({ today, storage }: DailyGameProps) {
           setLeaderboard(entries);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .then(() => {
+        if (!isCanceled) {
+          setIsLeaderboardLoading(false);
+        }
+      });
 
     return () => {
       isCanceled = true;
@@ -282,7 +289,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 
     if (currentIndex === 0) {
       setCurrentIndex(0);
-      setMode("home");
+      showHome();
       return;
     }
 
@@ -301,7 +308,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   function handleBackReviewQuestion() {
     if (currentIndex === 0) {
       setCurrentIndex(0);
-      setMode("home");
+      showHome();
       return;
     }
 
@@ -358,6 +365,14 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
+    showHome();
+  }
+
+  function showHome() {
+    if (shouldUseRemoteResults) {
+      setIsLeaderboardLoading(true);
+    }
+
     setMode("home");
   }
 
@@ -367,6 +382,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
         <HomeScreen
           dateKey={dateKey}
           isEditingName={isEditingName}
+          isLeaderboardLoading={isLeaderboardLoading}
           isStarting={isStarting}
           leaderboard={leaderboard}
           nameInput={nameInput}
@@ -414,6 +430,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 type HomeScreenProps = {
   dateKey: string;
   isEditingName: boolean;
+  isLeaderboardLoading: boolean;
   isStarting: boolean;
   leaderboard: LeaderboardEntry[];
   nameInput: string;
@@ -427,6 +444,7 @@ type HomeScreenProps = {
 function HomeScreen({
   dateKey,
   isEditingName,
+  isLeaderboardLoading,
   isStarting,
   leaderboard,
   nameInput,
@@ -462,7 +480,7 @@ function HomeScreen({
 
       <div aria-hidden="true" />
 
-      <Leaderboard entries={leaderboard} />
+      <Leaderboard entries={leaderboard} isLoading={isLeaderboardLoading} />
 
       <div aria-hidden="true" />
 
@@ -506,12 +524,18 @@ function HomeScreen({
   );
 }
 
-function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
+function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLoading: boolean }) {
   const display = entries;
   return (
-    <div className="leaderboard">
+    <div className="leaderboard" aria-busy={isLoading}>
       <p className="leaderboard-title">Top Players · Last 7 Days</p>
-      {display.length === 0 ? (
+      {isLoading ? (
+        <div className="leaderboard-skeleton" aria-label="Leaderboard loading" role="status">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <span aria-hidden="true" className="leaderboard-skeleton-bar" key={index} />
+          ))}
+        </div>
+      ) : display.length === 0 ? (
         <p className="leaderboard-empty">No scores yet this week</p>
       ) : (
         <ol className="leaderboard-list">
