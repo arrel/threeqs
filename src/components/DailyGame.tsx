@@ -531,7 +531,7 @@ function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLo
       <p className="leaderboard-title">Top Players · Last 7 Days</p>
       {isLoading ? (
         <div className="leaderboard-skeleton" aria-label="Leaderboard loading" role="status">
-          {Array.from({ length: 3 }).map((_, index) => (
+          {Array.from({ length: 5 }).map((_, index) => (
             <span aria-hidden="true" className="leaderboard-skeleton-bar" key={index} />
           ))}
         </div>

@@ -219,6 +219,14 @@ button:disabled {
   animation-delay: 240ms;
 }
 
+.leaderboard-skeleton-bar:nth-child(4) {
+  animation-delay: 360ms;
+}
+
+.leaderboard-skeleton-bar:nth-child(5) {
+  animation-delay: 480ms;
+}
+
 .leaderboard-list {
   display: grid;
   gap: 8px;

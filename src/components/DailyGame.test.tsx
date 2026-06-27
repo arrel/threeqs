@@ -219,6 +219,7 @@ describe("DailyGame", () => {
     render(<DailyGame today={today} />);
 
     expect(screen.getByLabelText("Leaderboard loading")).toBeInTheDocument();
+    expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(5);
     expect(screen.queryByText(/no scores yet this week/i)).not.toBeInTheDocument();
     await waitFor(() => expect(leaderboardRequests).toBe(1));
     resolveNextLeaderboard(pendingLeaderboardResponses);
@@ -243,6 +244,7 @@ describe("DailyGame", () => {
     await user.click(getButtonByText(/^continue$/i));
 
     expect(screen.getByLabelText("Leaderboard loading")).toBeInTheDocument();
+    expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(5);
     expect(screen.queryByText(/no scores yet this week/i)).not.toBeInTheDocument();
     await waitFor(() => expect(leaderboardRequests).toBe(2));
     resolveNextLeaderboard(pendingLeaderboardResponses);
