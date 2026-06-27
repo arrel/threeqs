@@ -720,7 +720,7 @@ const TimerPill = memo(function TimerPill({
   return (
     <div className={`timer-pill ${digitClass}`} aria-label={`${displaySeconds} seconds elapsed`}>
       <Clock3 size={17} />
-      {timerText}
+      <span className="timer-text">{timerText}</span>
     </div>
   );
 });

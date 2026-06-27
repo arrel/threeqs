@@ -477,7 +477,7 @@ button:disabled {
 .timer-pill {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   justify-self: end;
   gap: 6px;
   width: 66px;
@@ -491,6 +491,15 @@ button:disabled {
   font-weight: 600;
   white-space: nowrap;
   transition: width 180ms ease;
+}
+
+.timer-pill svg {
+  flex: 0 0 17px;
+}
+
+.timer-text {
+  min-width: 2.2em;
+  text-align: left;
 }
 
 .timer-pill.digits-2 {
