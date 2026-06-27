@@ -1,4 +1,5 @@
 import type { DailyResult, Medal, QuestionResult } from "@/lib/types";
+import { formatElapsedSeconds } from "@/lib/time";
 
 export const MAX_ATTEMPTS = 2;
 export const MAX_DAILY_SCORE = 390;
@@ -146,7 +147,7 @@ export function buildShareText(result: DailyResult): string {
     ...result.questionResults.map((question, index) => {
       const status = question.solved ? "correct" : "missed";
       const tries = question.attemptsUsed === 1 ? "1 try" : `${question.attemptsUsed} tries`;
-      return `Q${index + 1}: ${status}, ${tries}, ${Math.round(question.elapsedSeconds)}s`;
+      return `Q${index + 1}: ${status}, ${tries}, ${formatElapsedSeconds(Math.round(question.elapsedSeconds))}`;
     })
   ];
 

@@ -31,6 +31,7 @@ import {
   type DailyDraft,
   type StorageLike
 } from "@/lib/storage";
+import { formatElapsedSeconds } from "@/lib/time";
 import type { DailyResult, Problem, QuestionResult } from "@/lib/types";
 
 type DailyGameProps = {
@@ -1077,6 +1078,7 @@ const TimerPill = memo(function TimerPill({
 }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(() => getElapsedSeconds(startedAt));
   const displaySeconds = toWholeSeconds(frozenSeconds ?? elapsedSeconds);
+  const timerText = formatElapsedSeconds(displaySeconds);
   const digitClass = getTimerDigitClass(displaySeconds);
 
   useEffect(() => {
@@ -1095,7 +1097,7 @@ const TimerPill = memo(function TimerPill({
   return (
     <div className={`timer-pill ${digitClass}`} aria-label={`${displaySeconds} seconds elapsed`}>
       <Clock3 size={17} />
-      {displaySeconds}s
+      <span className="timer-text">{timerText}</span>
     </div>
   );
 });
@@ -1108,9 +1110,9 @@ function toWholeSeconds(seconds: number): number {
   return Math.max(0, Math.floor(seconds));
 }
 
-function getTimerDigitClass(seconds: number): "digits-1" | "digits-2" | "digits-3" {
-  if (seconds >= 100) {
-    return "digits-3";
+function getTimerDigitClass(seconds: number): "digits-1" | "digits-2" | "minutes" {
+  if (seconds >= 60) {
+    return "minutes";
   }
 
   if (seconds >= 10) {
@@ -1211,7 +1213,7 @@ function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
                 pts
               </span>
               <span className="question-status">{getAttemptLabel(question)}</span>
-              <span className="question-time">{Math.round(question.elapsedSeconds)}s</span>
+              <span className="question-time">{formatElapsedSeconds(Math.round(question.elapsedSeconds))}</span>
             </li>
           ))}
         </ul>
