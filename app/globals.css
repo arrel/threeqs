@@ -143,6 +143,8 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 92px;
+  min-height: 42px;
   width: fit-content;
   padding: 6px 12px 6px 6px;
   border: 1px solid #f0d99a;
@@ -160,6 +162,12 @@ button:disabled {
   color: #8c4b00;
 }
 
+.streak-value {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 42px;
+}
+
 .streak-pill strong {
   display: inline;
   font-size: 1rem;
@@ -173,6 +181,15 @@ button:disabled {
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+.streak-skeleton {
+  display: block;
+  width: 38px;
+  height: 14px;
+  border-radius: 999px;
+  background: #eadcc6;
+  animation: leaderboard-skeleton-pulse 1.3s ease-in-out infinite;
 }
 
 .leaderboard {
@@ -196,6 +213,12 @@ button:disabled {
   margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.leaderboard-body {
+  display: grid;
+  align-content: center;
+  min-height: 252px;
 }
 
 .leaderboard-skeleton {
@@ -351,7 +374,8 @@ button:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .leaderboard-skeleton-bar {
+  .leaderboard-skeleton-bar,
+  .streak-skeleton {
     animation: none;
   }
 }

@@ -5,7 +5,7 @@ import { DailyGame } from "@/components/DailyGame";
 import { problems } from "@/data/problems";
 import { getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems } from "@/lib/daily";
-import type { StorageLike } from "@/lib/storage";
+import { saveStudentName, type StorageLike } from "@/lib/storage";
 
 describe("DailyGame", () => {
   afterEach(() => {
@@ -222,7 +222,7 @@ describe("DailyGame", () => {
     expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(5);
     expect(screen.queryByText(/no scores yet this week/i)).not.toBeInTheDocument();
     await waitFor(() => expect(leaderboardRequests).toBe(1));
-    resolveNextLeaderboard(pendingLeaderboardResponses);
+    resolveNextResponse(pendingLeaderboardResponses);
 
     expect(await screen.findByText("Riley")).toBeInTheDocument();
     expect(leaderboardRequests).toBe(1);
@@ -247,11 +247,49 @@ describe("DailyGame", () => {
     expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(5);
     expect(screen.queryByText(/no scores yet this week/i)).not.toBeInTheDocument();
     await waitFor(() => expect(leaderboardRequests).toBe(2));
-    resolveNextLeaderboard(pendingLeaderboardResponses);
+    resolveNextResponse(pendingLeaderboardResponses);
 
     expect(await screen.findByText("Ada", { selector: ".leaderboard-name" })).toBeInTheDocument();
     expect(screen.queryByText("Riley", { selector: ".leaderboard-name" })).not.toBeInTheDocument();
     expect(leaderboardRequests).toBe(2);
+  });
+
+  it("shows a streak placeholder while saved remote history loads", async () => {
+    const today = new Date("2026-06-24T18:00:00Z");
+    const pendingHistoryResponses: Array<() => void> = [];
+    let historyRequests = 0;
+
+    saveStudentName("Ada", window.localStorage);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/api/leaderboard")) {
+          return jsonResponse({ entries: [] });
+        }
+
+        if (url.includes("/api/results")) {
+          historyRequests += 1;
+          return new Promise<Response>((resolve) => {
+            pendingHistoryResponses.push(() => resolve(jsonResponse({ results: [] })));
+          });
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      })
+    );
+
+    render(<DailyGame today={today} />);
+
+    expect(screen.getByLabelText("Streak loading")).toBeInTheDocument();
+    expect(screen.queryByLabelText("0 day streak")).not.toBeInTheDocument();
+
+    await waitFor(() => expect(historyRequests).toBe(1));
+    resolveNextResponse(pendingHistoryResponses);
+
+    expect(await screen.findByLabelText("0 day streak")).toBeInTheDocument();
   });
 });
 
@@ -289,11 +327,11 @@ function jsonResponse(payload: unknown): Response {
   });
 }
 
-function resolveNextLeaderboard(pendingResponses: Array<() => void>): void {
+function resolveNextResponse(pendingResponses: Array<() => void>): void {
   const resolve = pendingResponses.shift();
 
   if (!resolve) {
-    throw new Error("No pending leaderboard response to resolve.");
+    throw new Error("No pending response to resolve.");
   }
 
   resolve();

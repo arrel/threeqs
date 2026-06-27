@@ -58,6 +58,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   const [isSavingResult, setIsSavingResult] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(shouldUseRemoteResults);
+  const [isHomeHistoryLoading, setIsHomeHistoryLoading] = useState(shouldUseRemoteResults);
   const [isEditingName, setIsEditingName] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
@@ -69,6 +70,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     const savedName = getSavedStudentName(activeStorage);
 
     if (!savedName) {
+      setIsHomeHistoryLoading(false);
       return;
     }
 
@@ -77,11 +79,16 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     const savedHistory = getStudentHistory(savedName, activeStorage);
     setHistory(savedHistory);
     setHomeHistory(savedHistory);
-  }, [activeStorage]);
+
+    if (!shouldUseRemoteResults) {
+      setIsHomeHistoryLoading(false);
+    }
+  }, [activeStorage, shouldUseRemoteResults]);
 
   useEffect(() => {
     if (!trimmedInput) {
       setHomeHistory([]);
+      setIsHomeHistoryLoading(false);
       return undefined;
     }
 
@@ -89,10 +96,12 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     setHomeHistory(localHistory);
 
     if (!shouldUseRemoteResults) {
+      setIsHomeHistoryLoading(false);
       return undefined;
     }
 
     let isCanceled = false;
+    setIsHomeHistoryLoading(true);
 
     loadRemoteHistoryWithLocalFallback(trimmedInput, activeStorage)
       .then((remoteHistory) => {
@@ -103,6 +112,11 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       .catch(() => {
         if (!isCanceled) {
           setHomeHistory(localHistory);
+        }
+      })
+      .then(() => {
+        if (!isCanceled) {
+          setIsHomeHistoryLoading(false);
         }
       });
 
@@ -382,6 +396,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
         <HomeScreen
           dateKey={dateKey}
           isEditingName={isEditingName}
+          isHomeHistoryLoading={isHomeHistoryLoading}
           isLeaderboardLoading={isLeaderboardLoading}
           isStarting={isStarting}
           leaderboard={leaderboard}
@@ -430,6 +445,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 type HomeScreenProps = {
   dateKey: string;
   isEditingName: boolean;
+  isHomeHistoryLoading: boolean;
   isLeaderboardLoading: boolean;
   isStarting: boolean;
   leaderboard: LeaderboardEntry[];
@@ -444,6 +460,7 @@ type HomeScreenProps = {
 function HomeScreen({
   dateKey,
   isEditingName,
+  isHomeHistoryLoading,
   isLeaderboardLoading,
   isStarting,
   leaderboard,
@@ -460,13 +477,23 @@ function HomeScreen({
     <section className="app-card home-card" aria-label="Three Qs home">
       <div className="home-topbar">
         <p className="today-label home-date">{formatDateKey(dateKey)}</p>
-        <div className="streak-pill" aria-label={`${streak} day streak`}>
+        <div
+          aria-busy={isHomeHistoryLoading}
+          aria-label={isHomeHistoryLoading ? "Streak loading" : `${streak} day streak`}
+          className="streak-pill"
+        >
           <span className="streak-icon">
             <Flame size={18} />
           </span>
-          <span>
-            <strong>{streak}</strong>
-            <small>{streak === 1 ? "day" : "days"}</small>
+          <span className="streak-value">
+            {isHomeHistoryLoading ? (
+              <span aria-hidden="true" className="streak-skeleton" />
+            ) : (
+              <>
+                <strong>{streak}</strong>
+                <small>{streak === 1 ? "day" : "days"}</small>
+              </>
+            )}
           </span>
         </div>
       </div>
@@ -529,30 +556,32 @@ function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLo
   return (
     <div className="leaderboard" aria-busy={isLoading}>
       <p className="leaderboard-title">Top Players · Last 7 Days</p>
-      {isLoading ? (
-        <div className="leaderboard-skeleton" aria-label="Leaderboard loading" role="status">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <span aria-hidden="true" className="leaderboard-skeleton-bar" key={index} />
-          ))}
-        </div>
-      ) : display.length === 0 ? (
-        <p className="leaderboard-empty">No scores yet this week</p>
-      ) : (
-        <ol className="leaderboard-list">
-          {display.map((entry, index) => (
-            <li className="leaderboard-row" key={entry.studentName}>
-              <span className="leaderboard-rank">{index + 1}</span>
-              <span className="leaderboard-name">{entry.studentName}</span>
-              <span className="leaderboard-medals">
-                {entry.gold > 0 && <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>{entry.gold}</span>}
-                {entry.silver > 0 && <span className="lb-medal silver" data-tip={`${entry.silver} silver`} tabIndex={0}>{entry.silver}</span>}
-                {entry.bronze > 0 && <span className="lb-medal bronze" data-tip={`${entry.bronze} bronze`} tabIndex={0}>{entry.bronze}</span>}
-              </span>
-              <span className="leaderboard-pts">{entry.totalPoints}<small>pts</small></span>
-            </li>
-          ))}
-        </ol>
-      )}
+      <div className="leaderboard-body">
+        {isLoading ? (
+          <div className="leaderboard-skeleton" aria-label="Leaderboard loading" role="status">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <span aria-hidden="true" className="leaderboard-skeleton-bar" key={index} />
+            ))}
+          </div>
+        ) : display.length === 0 ? (
+          <p className="leaderboard-empty">No scores yet this week</p>
+        ) : (
+          <ol className="leaderboard-list">
+            {display.map((entry, index) => (
+              <li className="leaderboard-row" key={entry.studentName}>
+                <span className="leaderboard-rank">{index + 1}</span>
+                <span className="leaderboard-name">{entry.studentName}</span>
+                <span className="leaderboard-medals">
+                  {entry.gold > 0 && <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>{entry.gold}</span>}
+                  {entry.silver > 0 && <span className="lb-medal silver" data-tip={`${entry.silver} silver`} tabIndex={0}>{entry.silver}</span>}
+                  {entry.bronze > 0 && <span className="lb-medal bronze" data-tip={`${entry.bronze} bronze`} tabIndex={0}>{entry.bronze}</span>}
+                </span>
+                <span className="leaderboard-pts">{entry.totalPoints}<small>pts</small></span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
   );
 }
