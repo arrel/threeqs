@@ -806,7 +806,9 @@ function HomeScreen({
       <div aria-hidden="true" />
 
       <div className="home-copy">
-        <h1>Three Qs</h1>
+        <h1 className="home-wordmark">
+          Three<span className="home-wordmark-qs">Qs</span>
+        </h1>
         <p>Your daily math superbowl challenge</p>
       </div>
 

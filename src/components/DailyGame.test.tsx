@@ -39,7 +39,7 @@ describe("DailyGame", () => {
     await user.click(getButtonByText(/^continue$/i));
     expect(screen.getByText(/current streak/i)).toBeInTheDocument();
     await user.click(getButtonByText(/^continue$/i));
-    expect(screen.getByRole("heading", { name: "Three Qs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
 
     rerender(<DailyGame storage={storage} today={today} />);
     await user.click(getButtonByText(/^play$/i));
@@ -90,7 +90,7 @@ describe("DailyGame", () => {
 
     await user.click(screen.getByLabelText("Back"));
 
-    expect(screen.getByRole("heading", { name: "Three Qs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
   });
 
   it("allows one retry and reviews the first wrong guess with the correct answer", async () => {
@@ -168,7 +168,7 @@ describe("DailyGame", () => {
     await user.click(getButtonByText(/^check$/i));
     await user.click(screen.getByLabelText("Back"));
 
-    expect(screen.getByRole("heading", { name: "Three Qs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
 
     await user.click(getButtonByText(/^play$/i));
 
