@@ -65,6 +65,9 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   const [isStarting, setIsStarting] = useState(false);
   const [isSavingResult, setIsSavingResult] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(shouldUseRemoteResults);
+  const [isHomeHistoryLoading, setIsHomeHistoryLoading] = useState(shouldUseRemoteResults);
   const [isEditingName, setIsEditingName] = useState(false);
   const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
 
@@ -85,6 +88,8 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     const savedName = getSavedStudentName(activeStorage);
 
     if (!savedName) {
+      setIsProfileLoading(false);
+      setIsHomeHistoryLoading(false);
       setHasLoadedProfile(true);
       return;
     }
@@ -94,12 +99,19 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     const savedHistory = getStudentHistory(savedName, activeStorage);
     setHistory(savedHistory);
     setHomeHistory(savedHistory);
+
+    if (!shouldUseRemoteResults) {
+      setIsHomeHistoryLoading(false);
+    }
+
+    setIsProfileLoading(false);
     setHasLoadedProfile(true);
-  }, [activeStorage]);
+  }, [activeStorage, shouldUseRemoteResults]);
 
   useEffect(() => {
     if (!trimmedInput) {
       setHomeHistory([]);
+      setIsHomeHistoryLoading(false);
       return undefined;
     }
 
@@ -107,10 +119,12 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     setHomeHistory(localHistory);
 
     if (!shouldUseRemoteResults) {
+      setIsHomeHistoryLoading(false);
       return undefined;
     }
 
     let isCanceled = false;
+    setIsHomeHistoryLoading(true);
 
     loadRemoteHistoryWithLocalFallback(trimmedInput, activeStorage)
       .then((remoteHistory) => {
@@ -122,6 +136,11 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
         if (!isCanceled) {
           setHomeHistory(localHistory);
         }
+      })
+      .then(() => {
+        if (!isCanceled) {
+          setIsHomeHistoryLoading(false);
+        }
       });
 
     return () => {
@@ -130,11 +149,30 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }, [activeStorage, shouldUseRemoteResults, trimmedInput]);
 
   useEffect(() => {
-    if (!shouldUseRemoteResults) return;
+    if (!shouldUseRemoteResults || mode !== "home") {
+      return undefined;
+    }
+
+    let isCanceled = false;
+    setIsLeaderboardLoading(true);
+
     fetchLeaderboard()
-      .then(setLeaderboard)
-      .catch(() => {});
-  }, [shouldUseRemoteResults]);
+      .then((entries) => {
+        if (!isCanceled) {
+          setLeaderboard(entries);
+        }
+      })
+      .catch(() => {})
+      .then(() => {
+        if (!isCanceled) {
+          setIsLeaderboardLoading(false);
+        }
+      });
+
+    return () => {
+      isCanceled = true;
+    };
+  }, [mode, shouldUseRemoteResults]);
 
   useEffect(() => {
     if (!isRoutingEnabled || !route || !hasLoadedProfile) {
@@ -547,8 +585,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     if (currentIndex === 0) {
       saveDraftSnapshot({ questionResults: nextQuestionResults });
       setCurrentIndex(0);
-      setMode("home");
-      navigateTo({ screen: "home" });
+      showHome();
       return;
     }
 
@@ -580,8 +617,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   function handleBackReviewQuestion() {
     if (currentIndex === 0) {
       setCurrentIndex(0);
-      setMode("home");
-      navigateTo({ screen: "home" });
+      showHome();
       return;
     }
 
@@ -642,6 +678,14 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
+    showHome();
+  }
+
+  function showHome() {
+    if (shouldUseRemoteResults) {
+      setIsLeaderboardLoading(true);
+    }
+
     setMode("home");
     navigateTo({ screen: "home" });
   }
@@ -652,6 +696,9 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
         <HomeScreen
           dateKey={dateKey}
           isEditingName={isEditingName}
+          isHomeHistoryLoading={isHomeHistoryLoading}
+          isLeaderboardLoading={isLeaderboardLoading}
+          isProfileLoading={isProfileLoading}
           isStarting={isStarting}
           leaderboard={leaderboard}
           nameInput={nameInput}
@@ -699,6 +746,9 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
 type HomeScreenProps = {
   dateKey: string;
   isEditingName: boolean;
+  isHomeHistoryLoading: boolean;
+  isLeaderboardLoading: boolean;
+  isProfileLoading: boolean;
   isStarting: boolean;
   leaderboard: LeaderboardEntry[];
   nameInput: string;
@@ -712,6 +762,9 @@ type HomeScreenProps = {
 function HomeScreen({
   dateKey,
   isEditingName,
+  isHomeHistoryLoading,
+  isLeaderboardLoading,
+  isProfileLoading,
   isStarting,
   leaderboard,
   nameInput,
@@ -722,18 +775,29 @@ function HomeScreen({
   streak
 }: HomeScreenProps) {
   const showNameInput = !savedName || isEditingName;
+  const nameLabelId = "student-name-label";
 
   return (
     <section className="app-card home-card" aria-label="Three Qs home">
       <div className="home-topbar">
         <p className="today-label home-date">{formatDateKey(dateKey)}</p>
-        <div className="streak-pill" aria-label={`${streak} day streak`}>
+        <div
+          aria-busy={isHomeHistoryLoading}
+          aria-label={isHomeHistoryLoading ? "Streak loading" : `${streak} day streak`}
+          className="streak-pill"
+        >
           <span className="streak-icon">
             <Flame size={18} />
           </span>
-          <span>
-            <strong>{streak}</strong>
-            <small>{streak === 1 ? "day" : "days"}</small>
+          <span className="streak-value">
+            {isHomeHistoryLoading ? (
+              <span aria-hidden="true" className="streak-skeleton" />
+            ) : (
+              <>
+                <strong>{streak}</strong>
+                <small>{streak === 1 ? "day" : "days"}</small>
+              </>
+            )}
           </span>
         </div>
       </div>
@@ -747,36 +811,43 @@ function HomeScreen({
 
       <div aria-hidden="true" />
 
-      <Leaderboard entries={leaderboard} />
+      <Leaderboard entries={leaderboard} isLoading={isLeaderboardLoading} />
 
       <div aria-hidden="true" />
 
       <form className="home-form" onSubmit={onSubmit}>
-        {showNameInput ? (
-          <label className="input-label">
-            <span>Your Name</span>
+        <div className="name-field">
+          <span className="name-field-label" id={nameLabelId}>
+            Your Name
+          </span>
+          {isProfileLoading ? (
+            <div aria-label="Name loading" className="name-loading" role="status">
+              <span aria-hidden="true" className="name-skeleton-bar" />
+            </div>
+          ) : showNameInput ? (
             <input
               autoFocus={isEditingName}
+              aria-labelledby={nameLabelId}
               className="name-input"
               name="studentName"
               onChange={(event) => onNameChange(event.target.value)}
               placeholder="Type your name"
               value={nameInput}
             />
-          </label>
-        ) : (
-          <div className="name-display">
-            <span className="name-display-text">{savedName}</span>
-            <button
-              aria-label="Edit name"
-              className="name-edit-btn"
-              onClick={onEditName}
-              type="button"
-            >
-              <Pencil size={15} />
-            </button>
-          </div>
-        )}
+          ) : (
+            <div aria-labelledby={nameLabelId} className="name-display">
+              <span className="name-display-text">{savedName}</span>
+              <button
+                aria-label="Edit name"
+                className="name-edit-btn"
+                onClick={onEditName}
+                type="button"
+              >
+                <Pencil size={15} />
+              </button>
+            </div>
+          )}
+        </div>
 
         <button
           className="primary-action home-play-action"
@@ -791,29 +862,37 @@ function HomeScreen({
   );
 }
 
-function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
+function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLoading: boolean }) {
   const display = entries;
   return (
-    <div className="leaderboard">
+    <div className="leaderboard" aria-busy={isLoading}>
       <p className="leaderboard-title">Top Players · Last 7 Days</p>
-      {display.length === 0 ? (
-        <p className="leaderboard-empty">No scores yet this week</p>
-      ) : (
-        <ol className="leaderboard-list">
-          {display.map((entry, index) => (
-            <li className="leaderboard-row" key={entry.studentName}>
-              <span className="leaderboard-rank">{index + 1}</span>
-              <span className="leaderboard-name">{entry.studentName}</span>
-              <span className="leaderboard-medals">
-                {entry.gold > 0 && <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>{entry.gold}</span>}
-                {entry.silver > 0 && <span className="lb-medal silver" data-tip={`${entry.silver} silver`} tabIndex={0}>{entry.silver}</span>}
-                {entry.bronze > 0 && <span className="lb-medal bronze" data-tip={`${entry.bronze} bronze`} tabIndex={0}>{entry.bronze}</span>}
-              </span>
-              <span className="leaderboard-pts">{entry.totalPoints}<small>pts</small></span>
-            </li>
-          ))}
-        </ol>
-      )}
+      <div className="leaderboard-body">
+        {isLoading ? (
+          <div className="leaderboard-skeleton" aria-label="Leaderboard loading" role="status">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <span aria-hidden="true" className="leaderboard-skeleton-bar" key={index} />
+            ))}
+          </div>
+        ) : display.length === 0 ? (
+          <p className="leaderboard-empty">No scores yet this week</p>
+        ) : (
+          <ol className="leaderboard-list">
+            {display.map((entry, index) => (
+              <li className="leaderboard-row" key={entry.studentName}>
+                <span className="leaderboard-rank">{index + 1}</span>
+                <span className="leaderboard-name">{entry.studentName}</span>
+                <span className="leaderboard-medals">
+                  {entry.gold > 0 && <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>{entry.gold}</span>}
+                  {entry.silver > 0 && <span className="lb-medal silver" data-tip={`${entry.silver} silver`} tabIndex={0}>{entry.silver}</span>}
+                  {entry.bronze > 0 && <span className="lb-medal bronze" data-tip={`${entry.bronze} bronze`} tabIndex={0}>{entry.bronze}</span>}
+                </span>
+                <span className="leaderboard-pts">{entry.totalPoints}<small>pts</small></span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
   );
 }
