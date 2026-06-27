@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Medal, Pencil, Play, Trophy } from "lucide-react";
-import { FormEvent, memo, useEffect, useMemo, useState } from "react";
+import { FormEvent, memo, useCallback, useEffect, useMemo, useState } from "react";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems, shuffleWithSeed } from "@/lib/daily";
+import type { GameRoute, RouteNavigation } from "@/lib/gameRoutes";
 import { fetchLeaderboard, fetchRemoteHistory, saveRemoteDailyResult } from "@/lib/remoteResults";
 import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
 import {
@@ -18,28 +19,35 @@ import {
 } from "@/lib/score";
 import {
   calculateCurrentStreak,
+  clearDailyDraft,
+  getDailyDraft,
   getSavedStudentName,
   getStudentHistory,
   normalizeStudentName,
   replaceStudentHistory,
+  saveDailyDraft,
   saveDailyResult,
   saveStudentName,
+  type DailyDraft,
   type StorageLike
 } from "@/lib/storage";
 import type { DailyResult, Problem, QuestionResult } from "@/lib/types";
 
 type DailyGameProps = {
+  onRouteChange?(route: GameRoute, navigation?: RouteNavigation): void;
+  route?: GameRoute;
   today?: Date;
   storage?: StorageLike;
 };
 
 type GameMode = "home" | "quiz" | "review" | "score" | "streak";
 
-export function DailyGame({ today, storage }: DailyGameProps) {
+export function DailyGame({ onRouteChange, route, today, storage }: DailyGameProps) {
   const dateKey = useMemo(() => getPacificDateKey(today), [today]);
   const dailyProblems = useMemo(() => selectDailyProblems(problems, dateKey), [dateKey]);
   const activeStorage = storage;
   const shouldUseRemoteResults = storage === undefined;
+  const isRoutingEnabled = Boolean(route && onRouteChange);
 
   const [mode, setMode] = useState<GameMode>("home");
   const [nameInput, setNameInput] = useState("");
@@ -61,18 +69,28 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(shouldUseRemoteResults);
   const [isHomeHistoryLoading, setIsHomeHistoryLoading] = useState(shouldUseRemoteResults);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
   const homeStreak = calculateCurrentStreak(homeHistory, dateKey);
   const streak = calculateCurrentStreak(history, dateKey);
   const currentProblem = dailyProblems[currentIndex];
 
+  const navigateTo = useCallback(
+    (nextRoute: GameRoute, navigation: RouteNavigation = "push") => {
+      onRouteChange?.(nextRoute, navigation);
+    },
+    [onRouteChange]
+  );
+
   useEffect(() => {
+    setHasLoadedProfile(false);
     const savedName = getSavedStudentName(activeStorage);
 
     if (!savedName) {
       setIsProfileLoading(false);
       setIsHomeHistoryLoading(false);
+      setHasLoadedProfile(true);
       return;
     }
 
@@ -87,6 +105,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     }
 
     setIsProfileLoading(false);
+    setHasLoadedProfile(true);
   }, [activeStorage, shouldUseRemoteResults]);
 
   useEffect(() => {
@@ -155,6 +174,220 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     };
   }, [mode, shouldUseRemoteResults]);
 
+  useEffect(() => {
+    if (!isRoutingEnabled || !route || !hasLoadedProfile) {
+      return;
+    }
+
+    if (route.screen === "home") {
+      setMode("home");
+      return;
+    }
+
+    const savedName = getSavedStudentName(activeStorage);
+
+    if (!savedName) {
+      forceHome();
+      return;
+    }
+
+    const savedHistory = getStudentHistory(savedName, activeStorage);
+    const existingResult = savedHistory.find((result) => result.dateKey === dateKey);
+
+    setNameInput(savedName);
+    setStudentName(savedName);
+    setHistory(savedHistory);
+    setHomeHistory(savedHistory);
+
+    if (route.screen === "invalid") {
+      forceHome();
+      return;
+    }
+
+    if (existingResult) {
+      restoreCompletedRoute(existingResult, route);
+      return;
+    }
+
+    const draft = getDailyDraft(savedName, dateKey, activeStorage);
+
+    if (route.screen === "streak") {
+      forceHome();
+      return;
+    }
+
+    if (route.screen === "results") {
+      restoreDraftResultsRoute(savedName, draft);
+      return;
+    }
+
+    restoreQuestionRoute(draft, route.questionIndex);
+  }, [activeStorage, dateKey, hasLoadedProfile, isRoutingEnabled, navigateTo, route]);
+
+  useEffect(() => {
+    if (mode !== "quiz" || !studentName) {
+      return;
+    }
+
+    saveDraftSnapshot();
+  }, [
+    activeStorage,
+    attemptedChoiceIds,
+    checkedResult,
+    currentIndex,
+    dateKey,
+    isCurrentQuestionFinalized,
+    mode,
+    questionResults,
+    questionStart,
+    selectedChoiceId,
+    studentName
+  ]);
+
+  function forceHome() {
+    setCurrentIndex(0);
+    setSelectedChoiceId(null);
+    setAttemptedChoiceIds([]);
+    setCheckedResult(null);
+    setIsCurrentQuestionFinalized(false);
+    setMode("home");
+    navigateTo({ screen: "home" }, "replace");
+  }
+
+  function restoreCompletedRoute(result: DailyResult, targetRoute: GameRoute) {
+    setCurrentResult(result);
+    setQuestionResults(result.questionResults);
+    setSelectedChoiceId(null);
+    setAttemptedChoiceIds([]);
+    setCheckedResult(null);
+    setIsCurrentQuestionFinalized(false);
+    setQuestionStart(performance.now());
+
+    if (targetRoute.screen === "question") {
+      setCurrentIndex(targetRoute.questionIndex);
+      setMode("review");
+      return;
+    }
+
+    if (targetRoute.screen === "results") {
+      setCurrentIndex(0);
+      setMode("score");
+      return;
+    }
+
+    if (targetRoute.screen === "streak") {
+      setCurrentIndex(0);
+      setMode("streak");
+      return;
+    }
+
+    forceHome();
+  }
+
+  function restoreDraftResultsRoute(savedName: string, draft: DailyDraft | null) {
+    const completeResults = draft
+      ? getCompleteQuestionResults(draft.questionResults, dailyProblems.length)
+      : null;
+
+    if (!completeResults) {
+      forceHome();
+      return;
+    }
+
+    setCurrentResult(
+      buildDailyResult({
+        dateKey,
+        studentName: savedName,
+        questionResults: completeResults
+      })
+    );
+    setQuestionResults(completeResults);
+    setCurrentIndex(dailyProblems.length - 1);
+    setSelectedChoiceId(null);
+    setAttemptedChoiceIds([]);
+    setCheckedResult(null);
+    setIsCurrentQuestionFinalized(false);
+    setQuestionStart(performance.now());
+    setMode("score");
+  }
+
+  function restoreQuestionRoute(draft: DailyDraft | null, questionIndex: number) {
+    if (questionIndex < 0 || questionIndex >= dailyProblems.length) {
+      forceHome();
+      return;
+    }
+
+    if (!draft) {
+      if (questionIndex > 0) {
+        forceHome();
+        return;
+      }
+
+      setCurrentResult(null);
+      setQuestionResults([]);
+      setCurrentIndex(0);
+      setSelectedChoiceId(null);
+      setAttemptedChoiceIds([]);
+      setCheckedResult(null);
+      setIsCurrentQuestionFinalized(false);
+      setQuestionStart(performance.now());
+      setMode("quiz");
+      return;
+    }
+
+    const firstIncompleteQuestionIndex = getFirstIncompleteQuestionIndex(
+      draft.questionResults,
+      dailyProblems.length
+    );
+
+    if (questionIndex > firstIncompleteQuestionIndex) {
+      forceHome();
+      return;
+    }
+
+    const draftCurrentIndex = clampQuestionIndex(draft.currentIndex, dailyProblems.length);
+    const shouldRestoreActiveQuestion =
+      draftCurrentIndex === questionIndex && !getQuestionResultAt(draft.questionResults, questionIndex);
+
+    setCurrentResult(null);
+    setQuestionResults(draft.questionResults);
+    setCurrentIndex(questionIndex);
+    setSelectedChoiceId(shouldRestoreActiveQuestion ? draft.selectedChoiceId : null);
+    setAttemptedChoiceIds(shouldRestoreActiveQuestion ? draft.attemptedChoiceIds : []);
+    setCheckedResult(shouldRestoreActiveQuestion ? draft.checkedResult : null);
+    setIsCurrentQuestionFinalized(
+      shouldRestoreActiveQuestion ? draft.isCurrentQuestionFinalized : false
+    );
+    setQuestionStart(
+      shouldRestoreActiveQuestion
+        ? getRestoredQuestionStart(draft.questionStartedAtMs)
+        : performance.now()
+    );
+    setMode("quiz");
+  }
+
+  function saveDraftSnapshot(overrides: Partial<DailyDraft> = {}) {
+    if (!studentName) {
+      return;
+    }
+
+    saveDailyDraft(
+      {
+        dateKey,
+        studentName,
+        currentIndex,
+        questionResults,
+        selectedChoiceId,
+        attemptedChoiceIds,
+        checkedResult,
+        isCurrentQuestionFinalized,
+        questionStartedAtMs: getQuestionStartedAtMs(questionStart),
+        ...overrides
+      },
+      activeStorage
+    );
+  }
+
   async function handleStart(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -180,6 +413,29 @@ export function DailyGame({ today, storage }: DailyGameProps) {
         setQuestionResults(existingResult.questionResults);
         setCurrentIndex(0);
         setMode("review");
+        navigateTo({ screen: "question", questionIndex: 0 });
+        return;
+      }
+
+      const draft = getDailyDraft(trimmedInput, dateKey, activeStorage);
+      if (draft) {
+        const firstIncompleteQuestionIndex = getFirstIncompleteQuestionIndex(
+          draft.questionResults,
+          dailyProblems.length
+        );
+
+        if (firstIncompleteQuestionIndex >= dailyProblems.length) {
+          restoreDraftResultsRoute(trimmedInput, draft);
+          navigateTo({ screen: "results" });
+          return;
+        }
+
+        const questionIndex = Math.min(
+          clampQuestionIndex(draft.currentIndex, dailyProblems.length),
+          firstIncompleteQuestionIndex
+        );
+        restoreQuestionRoute(draft, questionIndex);
+        navigateTo({ screen: "question", questionIndex });
         return;
       }
 
@@ -192,6 +448,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       ) {
         setCurrentResult(null);
         setMode("quiz");
+        navigateTo({ screen: "question", questionIndex: currentIndex });
         return;
       }
 
@@ -200,6 +457,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       setCurrentIndex(0);
       startQuestion();
       setMode("quiz");
+      navigateTo({ screen: "question", questionIndex: 0 });
     } finally {
       setIsStarting(false);
     }
@@ -274,7 +532,18 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     }
 
     if (currentIndex < dailyProblems.length - 1) {
-      moveToQuestion(currentIndex + 1, nextQuestionResults);
+      const nextIndex = currentIndex + 1;
+      saveDraftSnapshot({
+        currentIndex: nextIndex,
+        questionResults: nextQuestionResults,
+        selectedChoiceId: null,
+        attemptedChoiceIds: [],
+        checkedResult: null,
+        isCurrentQuestionFinalized: false,
+        questionStartedAtMs: Date.now()
+      });
+      moveToQuestion(nextIndex, nextQuestionResults);
+      navigateTo({ screen: "question", questionIndex: nextIndex });
       return;
     }
 
@@ -284,14 +553,22 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       return;
     }
 
-    setCurrentResult(
-      buildDailyResult({
-        dateKey,
-        studentName,
-        questionResults: completeResults
-      })
-    );
+    const nextResult = buildDailyResult({
+      dateKey,
+      studentName,
+      questionResults: completeResults
+    });
+
+    saveDraftSnapshot({
+      questionResults: completeResults,
+      selectedChoiceId: null,
+      attemptedChoiceIds: [],
+      checkedResult: null,
+      isCurrentQuestionFinalized: false
+    });
+    setCurrentResult(nextResult);
     setMode("score");
+    navigateTo({ screen: "results" });
   }
 
   function handleBackQuestion() {
@@ -306,21 +583,35 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     }
 
     if (currentIndex === 0) {
+      saveDraftSnapshot({ questionResults: nextQuestionResults });
       setCurrentIndex(0);
       showHome();
       return;
     }
 
-    moveToQuestion(currentIndex - 1, nextQuestionResults);
+    const previousIndex = currentIndex - 1;
+    saveDraftSnapshot({
+      currentIndex: previousIndex,
+      questionResults: nextQuestionResults,
+      selectedChoiceId: null,
+      attemptedChoiceIds: [],
+      checkedResult: null,
+      isCurrentQuestionFinalized: false
+    });
+    moveToQuestion(previousIndex, nextQuestionResults);
+    navigateTo({ screen: "question", questionIndex: previousIndex });
   }
 
   function handleNextReviewQuestion() {
     if (currentIndex < dailyProblems.length - 1) {
-      setCurrentIndex((value) => value + 1);
+      const nextIndex = currentIndex + 1;
+      setCurrentIndex(nextIndex);
+      navigateTo({ screen: "question", questionIndex: nextIndex });
       return;
     }
 
     setMode("score");
+    navigateTo({ screen: "results" });
   }
 
   function handleBackReviewQuestion() {
@@ -330,7 +621,9 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       return;
     }
 
-    setCurrentIndex((value) => value - 1);
+    const previousIndex = currentIndex - 1;
+    setCurrentIndex(previousIndex);
+    navigateTo({ screen: "question", questionIndex: previousIndex });
   }
 
   function moveToQuestion(index: number, results: QuestionResult[]) {
@@ -368,9 +661,11 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       const nextHistory = shouldUseRemoteResults
         ? await loadRemoteHistoryWithLocalFallback(savedResult.studentName, activeStorage)
         : getStudentHistory(savedResult.studentName, activeStorage);
+      clearDailyDraft(savedResult.studentName, dateKey, activeStorage);
       setHistory(nextHistory);
       setHomeHistory(nextHistory);
       setMode("streak");
+      navigateTo({ screen: "streak" });
     } finally {
       setIsSavingResult(false);
     }
@@ -392,6 +687,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     }
 
     setMode("home");
+    navigateTo({ screen: "home" });
   }
 
   return (
@@ -965,6 +1261,32 @@ function StreakScreen({ onContinue, streak }: StreakScreenProps) {
 
 function getQuestionResultAt(results: QuestionResult[], index: number): QuestionResult | null {
   return results[index] ?? null;
+}
+
+function getFirstIncompleteQuestionIndex(results: QuestionResult[], totalQuestions: number): number {
+  for (let index = 0; index < totalQuestions; index += 1) {
+    if (!getQuestionResultAt(results, index)) {
+      return index;
+    }
+  }
+
+  return totalQuestions;
+}
+
+function clampQuestionIndex(index: number, totalQuestions: number): number {
+  if (totalQuestions <= 1) {
+    return 0;
+  }
+
+  return Math.min(Math.max(0, Math.floor(index)), totalQuestions - 1);
+}
+
+function getQuestionStartedAtMs(questionStart: number): number {
+  return Date.now() - Math.max(0, performance.now() - questionStart);
+}
+
+function getRestoredQuestionStart(questionStartedAtMs: number): number {
+  return performance.now() - Math.max(0, Date.now() - questionStartedAtMs);
 }
 
 function upsertQuestionResult(
