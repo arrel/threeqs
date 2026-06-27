@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { getAttemptPoints, getMedal, getQuestionMedal, getSpeedBonus, scoreQuestion } from "@/lib/score";
+import {
+  buildShareText,
+  getAttemptPoints,
+  getMedal,
+  getQuestionMedal,
+  getSpeedBonus,
+  scoreQuestion
+} from "@/lib/score";
 
 describe("scoring", () => {
   it("awards attempt points for first and second try solves", () => {
@@ -46,5 +53,33 @@ describe("scoring", () => {
     expect(getQuestionMedal(80)).toBe("silver");
     expect(getQuestionMedal(50)).toBe("silver");
     expect(getQuestionMedal(0)).toBe("bronze");
+  });
+
+  it("formats share text elapsed time over a minute as minutes and seconds", () => {
+    expect(
+      buildShareText({
+        dateKey: "2026-06-24",
+        studentName: "Ada",
+        totalScore: 50,
+        maxScore: 390,
+        medal: "practice",
+        completedAt: "2026-06-24T18:00:00.000Z",
+        shareText: "",
+        questionResults: [
+          {
+            problemId: "p1",
+            difficulty: "medium",
+            selectedChoiceIds: ["A", "C"],
+            correctChoiceId: "C",
+            attemptsUsed: 2,
+            solved: true,
+            elapsedSeconds: 203.2,
+            attemptPoints: 50,
+            speedBonus: 0,
+            score: 50
+          }
+        ]
+      })
+    ).toContain("Q1: correct, 2 tries, 3m 23s");
   });
 });

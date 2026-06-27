@@ -1,5 +1,5 @@
 import { RoutedDailyGame } from "@/components/RoutedDailyGame";
 
-export default function Home() {
+export default function StreakPage() {
   return <RoutedDailyGame />;
 }
