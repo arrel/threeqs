@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Medal, Play, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Medal, Pencil, Play, Trophy } from "lucide-react";
 import { FormEvent, memo, useEffect, useMemo, useState } from "react";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems, shuffleWithSeed } from "@/lib/daily";
-import { fetchRemoteHistory, saveRemoteDailyResult } from "@/lib/remoteResults";
+import { fetchLeaderboard, fetchRemoteHistory, saveRemoteDailyResult } from "@/lib/remoteResults";
+import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
 import {
   MAX_ATTEMPTS,
   MAX_DAILY_SCORE,
@@ -55,6 +56,8 @@ export function DailyGame({ today, storage }: DailyGameProps) {
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
   const [isStarting, setIsStarting] = useState(false);
   const [isSavingResult, setIsSavingResult] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isEditingName, setIsEditingName] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
   const homeStreak = calculateCurrentStreak(homeHistory, dateKey);
@@ -107,6 +110,13 @@ export function DailyGame({ today, storage }: DailyGameProps) {
     };
   }, [activeStorage, shouldUseRemoteResults, trimmedInput]);
 
+  useEffect(() => {
+    if (!shouldUseRemoteResults) return;
+    fetchLeaderboard()
+      .then(setLeaderboard)
+      .catch(() => {});
+  }, [shouldUseRemoteResults]);
+
   async function handleStart(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -116,6 +126,7 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 
     saveStudentName(trimmedInput, activeStorage);
     setStudentName(trimmedInput);
+    setIsEditingName(false);
     setIsStarting(true);
 
     try {
@@ -342,10 +353,14 @@ export function DailyGame({ today, storage }: DailyGameProps) {
       {mode === "home" ? (
         <HomeScreen
           dateKey={dateKey}
-          nameInput={nameInput}
+          isEditingName={isEditingName}
           isStarting={isStarting}
+          leaderboard={leaderboard}
+          nameInput={nameInput}
+          onEditName={() => setIsEditingName(true)}
           onNameChange={setNameInput}
           onSubmit={handleStart}
+          savedName={studentName}
           streak={homeStreak}
         />
       ) : null}
@@ -385,50 +400,85 @@ export function DailyGame({ today, storage }: DailyGameProps) {
 
 type HomeScreenProps = {
   dateKey: string;
+  isEditingName: boolean;
   isStarting: boolean;
+  leaderboard: LeaderboardEntry[];
   nameInput: string;
+  onEditName(): void;
   onNameChange(name: string): void;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
+  savedName: string;
   streak: number;
 };
 
-function HomeScreen({ dateKey, isStarting, nameInput, onNameChange, onSubmit, streak }: HomeScreenProps) {
+function HomeScreen({
+  dateKey,
+  isEditingName,
+  isStarting,
+  leaderboard,
+  nameInput,
+  onEditName,
+  onNameChange,
+  onSubmit,
+  savedName,
+  streak
+}: HomeScreenProps) {
+  const showNameInput = !savedName || isEditingName;
+
   return (
     <section className="app-card home-card" aria-label="Three Qs home">
-      <div className="home-top-spacer" aria-hidden="true" />
+      <div className="home-topbar">
+        <p className="today-label home-date">{formatDateKey(dateKey)}</p>
+        <div className="streak-pill" aria-label={`${streak} day streak`}>
+          <span className="streak-icon">
+            <Flame size={18} />
+          </span>
+          <span>
+            <strong>{streak}</strong>
+            <small>{streak === 1 ? "day" : "days"}</small>
+          </span>
+        </div>
+      </div>
+
+      <div aria-hidden="true" />
 
       <div className="home-copy">
         <h1>Three Qs</h1>
         <p>Your daily math superbowl challenge</p>
       </div>
 
-      <div className="home-spacer" aria-hidden="true" />
+      <div aria-hidden="true" />
 
-      <p className="today-label home-date">{formatDateKey(dateKey)}</p>
+      <Leaderboard entries={leaderboard} />
 
-      <div className="streak-pill" aria-label={`${streak} day streak`}>
-        <span className="streak-icon">
-          <Flame size={23} />
-        </span>
-        <span>
-          <strong>{streak}</strong>
-          <small>day streak</small>
-        </span>
-      </div>
-
-      <div className="home-spacer compact" aria-hidden="true" />
+      <div aria-hidden="true" />
 
       <form className="home-form" onSubmit={onSubmit}>
-        <label className="input-label">
-          <span>Your Name</span>
-          <input
-            className="name-input"
-            name="studentName"
-            onChange={(event) => onNameChange(event.target.value)}
-            placeholder="Type your name"
-            value={nameInput}
-          />
-        </label>
+        {showNameInput ? (
+          <label className="input-label">
+            <span>Your Name</span>
+            <input
+              autoFocus={isEditingName}
+              className="name-input"
+              name="studentName"
+              onChange={(event) => onNameChange(event.target.value)}
+              placeholder="Type your name"
+              value={nameInput}
+            />
+          </label>
+        ) : (
+          <div className="name-display">
+            <span className="name-display-text">{savedName}</span>
+            <button
+              aria-label="Edit name"
+              className="name-edit-btn"
+              onClick={onEditName}
+              type="button"
+            >
+              <Pencil size={15} />
+            </button>
+          </div>
+        )}
 
         <button
           className="primary-action home-play-action"
@@ -440,6 +490,33 @@ function HomeScreen({ dateKey, isStarting, nameInput, onNameChange, onSubmit, st
         </button>
       </form>
     </section>
+  );
+}
+
+function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
+  const display = entries;
+  return (
+    <div className="leaderboard">
+      <p className="leaderboard-title">Top Players · Last 7 Days</p>
+      {display.length === 0 ? (
+        <p className="leaderboard-empty">No scores yet this week</p>
+      ) : (
+        <ol className="leaderboard-list">
+          {display.map((entry, index) => (
+            <li className="leaderboard-row" key={entry.studentName}>
+              <span className="leaderboard-rank">{index + 1}</span>
+              <span className="leaderboard-name">{entry.studentName}</span>
+              <span className="leaderboard-medals">
+                {entry.gold > 0 && <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>{entry.gold}</span>}
+                {entry.silver > 0 && <span className="lb-medal silver" data-tip={`${entry.silver} silver`} tabIndex={0}>{entry.silver}</span>}
+                {entry.bronze > 0 && <span className="lb-medal bronze" data-tip={`${entry.bronze} bronze`} tabIndex={0}>{entry.bronze}</span>}
+              </span>
+              <span className="leaderboard-pts">{entry.totalPoints}<small>pts</small></span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -510,7 +587,7 @@ function QuestionScreen({
   return (
     <section className="app-card quiz-card" aria-label="Question screen">
       <header className="quiz-topbar">
-        <button className="back-button" aria-label="Back" onClick={onBack} type="button">
+        <button className="quiz-back-btn" aria-label="Back" onClick={onBack} type="button">
           <ArrowLeft size={23} />
         </button>
 

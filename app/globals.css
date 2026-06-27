@@ -84,17 +84,16 @@ button:disabled {
 }
 
 .home-card {
-  align-content: stretch;
-  grid-template-rows: auto auto minmax(var(--home-spacer-height), 1fr) auto auto minmax(var(--home-spacer-height), 1fr) auto;
+  grid-template-rows: auto 1fr auto 1fr auto 1fr auto;
   gap: 0;
-  /* Bottom + horizontal insets match .quiz-footer so the Play button lands in
-     the exact same spot as the Check button on the question screen. */
-  padding: clamp(26px, 7vw, 44px) clamp(18px, 5vw, 32px) 24px;
-  --home-spacer-height: 48px;
+  padding: clamp(20px, 5vw, 32px) clamp(18px, 5vw, 32px) 24px;
 }
 
-.home-top-spacer {
-  min-height: var(--home-spacer-height);
+.home-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 36px;
 }
 
 .home-copy,
@@ -113,12 +112,8 @@ button:disabled {
 }
 
 .home-date {
-  margin: 0 0 14px;
-  text-align: center;
-}
-
-.home-spacer {
-  min-height: var(--home-spacer-height);
+  margin: 0;
+  text-align: left;
 }
 
 .home-copy h1,
@@ -136,7 +131,7 @@ button:disabled {
 .home-copy p,
 .score-copy p,
 .streak-copy p {
-  margin: 14px auto 0;
+  margin: 10px auto 20px;
   max-width: 25rem;
   color: #4b4740;
   font-size: clamp(1.05rem, 3vw, 1.25rem);
@@ -147,12 +142,9 @@ button:disabled {
 .streak-pill {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  gap: 8px;
   width: fit-content;
-  min-width: 190px;
-  margin: 0 auto;
-  padding: 13px 18px;
+  padding: 6px 12px 6px 6px;
   border: 1px solid #f0d99a;
   border-radius: 999px;
   background: #fff7df;
@@ -160,8 +152,8 @@ button:disabled {
 
 .streak-icon {
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 28px;
+  height: 28px;
   place-items: center;
   border-radius: 50%;
   background: var(--yellow);
@@ -169,17 +161,191 @@ button:disabled {
 }
 
 .streak-pill strong {
-  display: block;
-  font-size: 1.5rem;
+  display: inline;
+  font-size: 1rem;
   font-weight: 900;
   line-height: 1;
 }
 
 .streak-pill small {
-  display: block;
-  margin-top: 3px;
+  display: inline;
+  margin-left: 3px;
   color: var(--muted);
+  font-size: 0.8rem;
   font-weight: 600;
+}
+
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.leaderboard-title {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.leaderboard-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: #f7f0e2;
+}
+
+.leaderboard-row:first-child {
+  background: var(--yellow);
+}
+
+.leaderboard-rank {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-align: center;
+}
+
+.leaderboard-row:first-child .leaderboard-rank {
+  color: #8b5200;
+}
+
+.leaderboard-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-medals {
+  display: flex;
+  gap: 5px;
+}
+
+.lb-medal {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: default;
+}
+
+.lb-medal::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.lb-medal:hover::after,
+.lb-medal:focus::after {
+  opacity: 1;
+}
+
+.lb-medal.gold {
+  background: var(--yellow);
+  border: 1.5px solid #c8871a;
+  color: #7c4a00;
+}
+
+.lb-medal.silver {
+  background: #ddd0bc;
+  border: 1.5px solid #b0a090;
+  color: #5a4a3a;
+}
+
+.lb-medal.bronze {
+  background: #f0cdb1;
+  border: 1.5px solid #c08060;
+  color: #8a4a22;
+}
+
+.leaderboard-pts {
+  font-size: 0.95rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.leaderboard-pts small {
+  margin-left: 2px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.name-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 0 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fffaf0;
+}
+
+.name-display-text {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name-edit-btn {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  transition: background 140ms ease;
+}
+
+.name-edit-btn:hover {
+  background: var(--line);
 }
 
 .home-form {
@@ -257,13 +423,12 @@ button:disabled {
 }
 
 .quiz-topbar {
-  display: grid;
-  grid-template-columns: 66px minmax(0, 1fr) 84px;
-  gap: 14px;
+  display: flex;
   align-items: center;
+  gap: 14px;
 }
 
-.back-button {
+.quiz-back-btn {
   display: grid;
   width: 66px;
   height: 40px;
@@ -279,7 +444,7 @@ button:disabled {
     transform 160ms ease;
 }
 
-.back-button:hover {
+.quiz-back-btn:hover {
   background: #f6e8cd;
   transform: translateY(-1px);
 }
@@ -288,11 +453,13 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 7px;
+  flex: 1;
   min-width: 0;
 }
 
 .progress-segment {
-  flex: 0.75 1 0;
+  flex: 1 1 20px;
+  min-width: 0;
   height: 12px;
   border-radius: 999px;
   background: var(--line);
@@ -679,6 +846,7 @@ button:disabled {
    em units for scripts/fractions and must keep their scaling. */
 .math-text .katex {
   font-size: 1em;
+  white-space: nowrap;
 }
 
 @media (min-width: 780px) {
@@ -711,7 +879,6 @@ button:disabled {
   }
 
   .quiz-topbar {
-    grid-template-columns: 66px minmax(0, 1fr) 84px;
     gap: 10px;
   }
 

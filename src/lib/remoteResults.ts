@@ -1,3 +1,4 @@
+import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
 import type { DailyResult } from "@/lib/types";
 
 type ResultsResponse = {
@@ -6,6 +7,10 @@ type ResultsResponse = {
 
 type SaveResponse = {
   result?: DailyResult;
+};
+
+type LeaderboardResponse = {
+  entries?: LeaderboardEntry[];
 };
 
 export async function fetchRemoteHistory(studentName: string): Promise<DailyResult[]> {
@@ -22,6 +27,17 @@ export async function fetchRemoteHistory(studentName: string): Promise<DailyResu
 
   const payload = (await response.json()) as ResultsResponse;
   return payload.results ?? [];
+}
+
+export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
+  const response = await fetch("/api/leaderboard", { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`Could not load leaderboard: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as LeaderboardResponse;
+  return payload.entries ?? [];
 }
 
 export async function saveRemoteDailyResult(result: DailyResult): Promise<DailyResult> {
