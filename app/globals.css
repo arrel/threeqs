@@ -121,9 +121,19 @@ button:disabled {
 }
 
 .screen-panel {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.screen-panel > .home-card,
+.screen-panel > .quiz-card,
+.screen-panel > .score-card,
+.screen-panel > .streak-card {
+  flex: 1 1 auto;
   min-height: 0;
 }
 
