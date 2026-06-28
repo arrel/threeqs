@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Medal, Pencil, Play, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy } from "lucide-react";
 import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BottomSheet } from "@/components/BottomSheet";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
@@ -32,18 +33,29 @@ import {
   type StorageLike
 } from "@/lib/storage";
 import { formatElapsedSeconds } from "@/lib/time";
-import type { DailyResult, Problem, QuestionResult } from "@/lib/types";
+import type { DailyResult, Problem, QuestionResult, VocabTerm } from "@/lib/types";
 
 type DailyGameProps = {
   onRouteChange?(route: GameRoute, navigation?: RouteNavigation): void;
   route?: GameRoute;
   today?: Date;
   storage?: StorageLike;
+  // Overridable so tests don't have to wait the real three minutes.
+  idlePromptAfterMs?: number;
 };
 
 type GameMode = "home" | "quiz" | "review" | "score" | "streak";
 
-export function DailyGame({ onRouteChange, route, today, storage }: DailyGameProps) {
+// Pop the "Are you still here?" prompt after three solid minutes of inactivity.
+const IDLE_PROMPT_AFTER_MS = 3 * 60 * 1000;
+
+export function DailyGame({
+  onRouteChange,
+  route,
+  today,
+  storage,
+  idlePromptAfterMs = IDLE_PROMPT_AFTER_MS
+}: DailyGameProps) {
   const dateKey = useMemo(() => getPacificDateKey(today), [today]);
   const dailyProblems = useMemo(() => selectDailyProblems(problems, dateKey), [dateKey]);
   const activeStorage = storage;
@@ -59,6 +71,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   const [currentIndex, setCurrentIndex] = useState(0);
   const [questionTimer, setQuestionTimer] = useState<QuestionTimer>(() => pausedTimer(0));
   const questionTimerRef = useRef(questionTimer);
+  const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [attemptedChoiceIds, setAttemptedChoiceIds] = useState<string[]>([]);
   const [checkedResult, setCheckedResult] = useState<QuestionResult | null>(null);
@@ -90,6 +103,12 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   const updateTimer = useCallback((next: QuestionTimer) => {
     questionTimerRef.current = next;
     setQuestionTimer(next);
+  }, []);
+
+  // An overlay (vocab help or the idle prompt) covering the question pauses the
+  // clock; dismissing it resumes from the same elapsed time.
+  const handleTimerPauseChange = useCallback((isPaused: boolean) => {
+    setIsTimerPaused(isPaused);
   }, []);
 
   useEffect(() => {
@@ -253,16 +272,15 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     studentName
   ]);
 
-  // The clock runs while the active (still-unanswered) question is on screen —
-  // including while reading "try again" feedback, since that's the same screen.
-  // Leaving the screen — navigating away, unmounting, or hiding the tab —
-  // pauses it; returning resumes from the same elapsed time. Once the question
-  // is answered the recorded time is frozen, so the running clock is moot.
+  // The clock runs while the active (still-unanswered) question is on screen and
+  // nothing is covering it. Leaving the screen — navigating away, unmounting,
+  // hiding the tab, or opening an overlay (vocab help / idle prompt) — pauses
+  // it; returning resumes from the same elapsed time.
   useEffect(() => {
     const isOnActiveQuestion =
       mode === "quiz" && !getQuestionResultAt(questionResults, currentIndex);
 
-    if (!isOnActiveQuestion) {
+    if (!isOnActiveQuestion || isTimerPaused) {
       return undefined;
     }
 
@@ -293,7 +311,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     // saveDraftSnapshot is intentionally omitted from deps: it is recreated
     // every render and always reads the latest values via closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, mode, questionResults, updateTimer]);
+  }, [currentIndex, isTimerPaused, mode, questionResults, updateTimer]);
 
   function forceHome() {
     setCurrentIndex(0);
@@ -511,6 +529,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }
 
   function startQuestion() {
+    setIsTimerPaused(false);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
@@ -684,6 +703,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     // The timer effect resumes (or, for a freshly started question, runs from
     // zero) once the new index lands on screen, so navigation only resets the
     // per-question answer state here.
+    setIsTimerPaused(false);
     setCurrentIndex(index);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
@@ -725,6 +745,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }
 
   function handleStreakContinue() {
+    setIsTimerPaused(false);
     setCurrentResult(null);
     setQuestionResults([]);
     setSelectedChoiceId(null);
@@ -769,11 +790,13 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
           currentIndex={currentIndex}
           isCurrentQuestionFinalized={isCurrentQuestionFinalized}
           isReview={mode === "review"}
+          idlePromptAfterMs={idlePromptAfterMs}
           onBack={mode === "review" ? handleBackReviewQuestion : handleBackQuestion}
           onCheck={handleCheck}
           onExplain={handleExplainQuestion}
           onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
           onSelectChoice={setSelectedChoiceId}
+          onTimerPauseChange={handleTimerPauseChange}
           onTryAgain={handleTryAgain}
           problem={currentProblem}
           questionTimer={questionTimer}
@@ -953,6 +976,7 @@ function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLo
 type QuestionScreenProps = {
   attemptedChoiceIds: string[];
   currentIndex: number;
+  idlePromptAfterMs: number;
   isCurrentQuestionFinalized: boolean;
   isReview: boolean;
   onBack(): void;
@@ -960,6 +984,7 @@ type QuestionScreenProps = {
   onExplain(): void;
   onNext(): void;
   onSelectChoice(choiceId: string): void;
+  onTimerPauseChange(isPaused: boolean): void;
   onTryAgain(): void;
   problem: Problem;
   questionTimer: QuestionTimer;
@@ -973,6 +998,7 @@ type QuestionScreenProps = {
 function QuestionScreen({
   attemptedChoiceIds,
   currentIndex,
+  idlePromptAfterMs,
   isCurrentQuestionFinalized,
   isReview,
   onBack,
@@ -980,6 +1006,7 @@ function QuestionScreen({
   onExplain,
   onNext,
   onSelectChoice,
+  onTimerPauseChange,
   onTryAgain,
   problem,
   questionTimer,
@@ -989,6 +1016,9 @@ function QuestionScreen({
   selectedChoiceId,
   totalQuestions
 }: QuestionScreenProps) {
+  const [isVocabOpen, setIsVocabOpen] = useState(false);
+  const [isIdleOpen, setIsIdleOpen] = useState(false);
+  const [selectedVocabTerm, setSelectedVocabTerm] = useState<VocabTerm | null>(null);
   const displayResult = isReview ? reviewResult : savedResult ?? result;
   const displayAttemptedChoiceIds = isReview
     ? reviewResult?.selectedChoiceIds ?? []
@@ -1006,6 +1036,7 @@ function QuestionScreen({
       !isCurrentQuestionFinalized &&
       displayResult.attemptsUsed < MAX_ATTEMPTS
   );
+  const vocabTerms = problem.vocabTerms ?? [];
 
   // Shuffle choices deterministically per problem so the order is randomized
   // but stays stable across re-renders, attempts, navigation, and review.
@@ -1013,6 +1044,54 @@ function QuestionScreen({
     () => shuffleWithSeed(problem.choices, problem.id),
     [problem.id, problem.choices]
   );
+
+  // Reset any open overlay when moving to a different question.
+  useEffect(() => {
+    setIsVocabOpen(false);
+    setIsIdleOpen(false);
+    setSelectedVocabTerm(null);
+  }, [problem.id]);
+
+  // Pause the clock whenever an overlay (vocab help or the idle prompt) covers
+  // the question, and resume the moment it is dismissed.
+  const isOverlayOpen = isVocabOpen || isIdleOpen;
+  useEffect(() => {
+    onTimerPauseChange(isOverlayOpen);
+  }, [isOverlayOpen, onTimerPauseChange]);
+
+  // After three solid minutes without any interaction on an unanswered
+  // question, raise the "Are you still here?" prompt over the question.
+  const isAwaitingAnswer = !isReview && !displayResult;
+  useEffect(() => {
+    if (!isAwaitingAnswer || isOverlayOpen) {
+      return undefined;
+    }
+
+    let timeoutId = window.setTimeout(() => setIsIdleOpen(true), idlePromptAfterMs);
+    const restart = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => setIsIdleOpen(true), idlePromptAfterMs);
+    };
+
+    const activityEvents = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"] as const;
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, restart, { passive: true })
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, restart));
+    };
+  }, [idlePromptAfterMs, isAwaitingAnswer, isOverlayOpen]);
+
+  function openVocabSheet(term: VocabTerm | null = null) {
+    if (vocabTerms.length === 0) {
+      return;
+    }
+
+    setSelectedVocabTerm(term ?? vocabTerms[0]);
+    setIsVocabOpen(true);
+  }
 
   return (
     <section className="app-card quiz-card" aria-label="Question screen">
@@ -1036,16 +1115,29 @@ function QuestionScreen({
           ))}
         </div>
 
-        <TimerPill
-          key={currentIndex}
-          frozenSeconds={displayResult?.elapsedSeconds}
-          timer={questionTimer}
-        />
+        <div className="quiz-tools">
+          {vocabTerms.length > 0 ? (
+            <button
+              aria-label="Open vocabulary help"
+              className="vocab-help-btn"
+              onClick={() => openVocabSheet()}
+              type="button"
+            >
+              <HelpCircle size={18} />
+            </button>
+          ) : null}
+
+          <TimerPill
+            key={currentIndex}
+            frozenSeconds={displayResult?.elapsedSeconds}
+            timer={questionTimer}
+          />
+        </div>
       </header>
 
       <div className="quiz-content">
         <div className="quiz-prompt">
-          <MathText text={problem.prompt} />
+          <MathText onVocabTermSelect={openVocabSheet} text={problem.prompt} vocabTerms={vocabTerms} />
         </div>
 
         <div className="answer-grid">
@@ -1117,6 +1209,53 @@ function QuestionScreen({
           result={result}
         />
       ) : null}
+
+      <BottomSheet
+        backdropTestId="vocab-backdrop"
+        closeLabel="Close vocabulary help"
+        onDismiss={() => setIsVocabOpen(false)}
+        open={isVocabOpen && vocabTerms.length > 0}
+        testId="vocab-sheet"
+        title="Words to Know"
+        titleId="vocab-sheet-title"
+      >
+        <div className="vocab-term-list">
+          {vocabTerms.map((term) => (
+            <article
+              className={["vocab-term-card", selectedVocabTerm?.term === term.term ? "selected" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              key={term.term}
+            >
+              <h3>{term.term}</h3>
+              <p>{term.definition}</p>
+            </article>
+          ))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        backdropTestId="idle-backdrop"
+        closeLabel="Dismiss reminder"
+        onDismiss={() => setIsIdleOpen(false)}
+        open={isIdleOpen}
+        testId="idle-sheet"
+        title="Are you still here?"
+        titleId="idle-sheet-title"
+      >
+        <div className="idle-prompt">
+          <p className="idle-prompt-copy">
+            Your timer is paused. Tap below when you&rsquo;re ready to keep going.
+          </p>
+          <button
+            className="primary-action"
+            onClick={() => setIsIdleOpen(false)}
+            type="button"
+          >
+            I&rsquo;m still here
+          </button>
+        </div>
+      </BottomSheet>
     </section>
   );
 }

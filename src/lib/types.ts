@@ -12,6 +12,12 @@ export type ProblemSource = {
   event?: string;
 };
 
+export type VocabTerm = {
+  term: string;
+  definition: string;
+  aliases?: string[];
+};
+
 export type Problem = {
   id: string;
   prompt: string;
@@ -20,6 +26,7 @@ export type Problem = {
   explanation: string;
   difficulty: Difficulty;
   topics: string[];
+  vocabTerms?: VocabTerm[];
   gradeBand: string;
   source: ProblemSource;
   adapted: boolean;

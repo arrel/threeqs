@@ -7,3 +7,6 @@ coverage
 *.log
 .env
 .env*.local
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
