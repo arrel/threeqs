@@ -3,7 +3,10 @@ import { RoutedDailyGame } from "@/components/RoutedDailyGame";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Three Qs",
+  title: {
+    default: "Three Qs",
+    template: "%s | Three Qs"
+  },
   description: "Three daily Math Super Bowl-style practice questions."
 };
 
