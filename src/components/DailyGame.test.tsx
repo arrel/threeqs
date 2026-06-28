@@ -99,6 +99,39 @@ describe("DailyGame", () => {
     expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
   });
 
+  it("sets forward and backward slide directions as screens advance and return", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const dailyProblems = selectDailyProblems(problems, dateKey);
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
+    expect(getScreenViewport()).toHaveAttribute("data-transition-direction", "forward");
+
+    await user.click(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`));
+    await user.click(getButtonByText(/^check$/i));
+    await user.click(getButtonByText(/^next$/i));
+
+    expect(screen.getByLabelText(/Question 2 of 3/i)).toBeInTheDocument();
+    expect(getScreenViewport()).toHaveAttribute("data-transition-direction", "forward");
+
+    await user.click(screen.getByLabelText("Back"));
+
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
+    expect(getScreenViewport()).toHaveAttribute("data-transition-direction", "backward");
+
+    await user.click(screen.getByLabelText("Back"));
+
+    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
+    expect(getScreenViewport()).toHaveAttribute("data-transition-direction", "backward");
+  });
+
   it("allows one retry and reviews the first wrong guess with the correct answer", async () => {
     const user = userEvent.setup();
     const storage = createMemoryStorage();
@@ -660,6 +693,16 @@ function getButtonByText(text: RegExp): HTMLButtonElement {
   }
 
   return button;
+}
+
+function getScreenViewport(): HTMLElement {
+  const viewport = document.querySelector<HTMLElement>(".screen-viewport");
+
+  if (!viewport) {
+    throw new Error("Could not find screen viewport.");
+  }
+
+  return viewport;
 }
 
 function finishVocabDismissal() {
