@@ -41,7 +41,7 @@ export const problems: Problem[] = [
   {
     id: "medium-gcf-bins",
     scheduledDate: "2026-06-28",
-    prompt: "A teacher has $48$ rulers and $60$ pairs of scissors. She wants to divide them into identical supply bins with no items left over. What is the maximum number of bins she can make?",
+    prompt: "A teacher has $48$ rulers and $60$ pairs of scissors. She wants to make matching supply bins with no items left over. What is the greatest number of bins she can make?",
     choices: [
       { id: "A", label: "6" },
       { id: "B", label: "12" },
@@ -66,7 +66,7 @@ export const problems: Problem[] = [
   {
     id: "stretch-exponent-simplify",
     scheduledDate: "2026-06-28",
-    prompt: "Simplify the following expression to a single power: $\\frac{2^5 \\cdot 4^3}{8^2}$.",
+    prompt: "Write this expression as one power: $\\frac{2^5 \\cdot 4^3}{8^2}$.",
     choices: [
       { id: "A", label: "$2^3$" },
       { id: "B", label: "$2^5$" },
@@ -118,7 +118,7 @@ export const problems: Problem[] = [
   {
     id: "medium-train-travel-time",
     scheduledDate: "2026-06-29",
-    prompt: "A train travels at a constant speed of $75$ miles per hour. How many minutes will it take to travel $45$ miles?",
+    prompt: "A train goes $75$ miles per hour. How many minutes will it take to go $45$ miles?",
     choices: [
       { id: "A", label: "30 minutes" },
       { id: "B", label: "36 minutes" },
@@ -142,7 +142,7 @@ export const problems: Problem[] = [
   {
     id: "stretch-jacket-discounts",
     scheduledDate: "2026-06-29",
-    prompt: "A jacket is on sale for $20\\%$ off its original price of $150$. At the cash register, an additional coupon of $10\\%$ off the sale price is applied. What is the final price before tax?",
+    prompt: "A jacket costs $150$ before a sale. It is $20\\%$ off, and then a coupon takes another $10\\%$ off the sale price. What is the final price before tax?",
     choices: [
       { id: "A", label: "$105" },
       { id: "B", label: "$108" },
@@ -170,7 +170,7 @@ export const problems: Problem[] = [
   {
     id: "easy-point-shift-quadrant",
     scheduledDate: "2026-06-30",
-    prompt: "Point $P$ starts at $(-3, 4)$ on the coordinate plane. If it is shifted down $6$ units and right $5$ units, what are its new coordinates?",
+    prompt: "Point $P$ starts at $(-3, 4)$ on the coordinate plane. Move it down $6$ units and right $5$ units. What are its new coordinates?",
     choices: [
       { id: "A", label: "$(2, -2)$" },
       { id: "B", label: "$(-8, 9)$" },
@@ -246,7 +246,7 @@ export const problems: Problem[] = [
   {
     id: "easy-triangle-theorem-sides",
     scheduledDate: "2026-07-01",
-    prompt: "Which of the following groups of lengths can form a valid triangle?",
+    prompt: "Which group of side lengths can make a triangle?",
     choices: [
       { id: "A", label: "2 cm, 3 cm, 6 cm" },
       { id: "B", label: "4 cm, 4 cm, 9 cm" },
@@ -270,7 +270,7 @@ export const problems: Problem[] = [
   {
     id: "medium-composite-shape-area",
     scheduledDate: "2026-07-01",
-    prompt: "A shape is composed of a rectangle with a length of $10$ cm and width of $6$ cm, with a right triangle attached to its side. The right triangle has a base of $4$ cm along the width of the rectangle ($6$ cm). What is the total area of this composite shape?",
+    prompt: "A shape is made from a $10$ cm by $6$ cm rectangle and a right triangle attached to one side. The triangle has base $4$ cm and height $6$ cm. What is the total area?",
     choices: [
       { id: "A", label: "68 sq cm" },
       { id: "B", label: "72 sq cm" },
@@ -294,7 +294,7 @@ export const problems: Problem[] = [
   {
     id: "stretch-prism-sa-calc",
     scheduledDate: "2026-07-01",
-    prompt: "A rectangular prism has a length of $5$ cm, a width of $4$ cm, and a height of $8$ cm. What is its total surface area?",
+    prompt: "A rectangular prism is $5$ cm long, $4$ cm wide, and $8$ cm tall. What is its total surface area?",
     choices: [
       { id: "A", label: "120 sq cm" },
       { id: "B", label: "160 sq cm" },
@@ -322,7 +322,7 @@ export const problems: Problem[] = [
   {
     id: "easy-outfit-combinations",
     scheduledDate: "2026-07-02",
-    prompt: "Sam is choosing an outfit. He has $4$ different shirts, $3$ pairs of pants, and $2$ pairs of shoes. How many unique outfit combinations can he create?",
+    prompt: "Sam is choosing an outfit. He has $4$ shirts, $3$ pairs of pants, and $2$ pairs of shoes. How many different outfits can he make?",
     choices: [
       { id: "A", label: "9" },
       { id: "B", label: "12" },
@@ -346,7 +346,7 @@ export const problems: Problem[] = [
   {
     id: "medium-sports-venn",
     scheduledDate: "2026-07-02",
-    prompt: "In a class of $30$ students, $17$ track students run cross country, $13$ play basketball, and $5$ participate in both sports. How many students participate in neither sport?",
+    prompt: "In a class of $30$ students, $17$ students run cross country, $13$ play basketball, and $5$ do both sports. How many students do neither sport?",
     choices: [
       { id: "A", label: "0" },
       { id: "B", label: "5" },
@@ -370,7 +370,7 @@ export const problems: Problem[] = [
   {
     id: "stretch-word-permutations",
     scheduledDate: "2026-07-02",
-    prompt: "How many unique 4-letter arrangements can be made using the letters from the word $MATH$ if no letters are repeated?",
+    prompt: "How many different 4-letter arrangements can you make from the letters in $MATH$ if you use each letter once?",
     choices: [
       { id: "A", label: "16" },
       { id: "B", label: "24" },
@@ -398,7 +398,7 @@ export const problems: Problem[] = [
   {
     id: "easy-die-coin-probability",
     scheduledDate: "2026-07-03",
-    prompt: "A fair 6-sided die is rolled, and a standard coin is flipped. What is the probability of rolling a $4$ and flipping heads?",
+    prompt: "You roll a fair 6-sided die and flip a coin. What is the probability of rolling a $4$ and getting heads?",
     choices: [
       { id: "A", label: "$\\frac{1}{12}$" },
       { id: "B", label: "$\\frac{1}{8}$" },
@@ -422,7 +422,7 @@ export const problems: Problem[] = [
   {
     id: "medium-grade-weighted-mean",
     scheduledDate: "2026-07-03",
-    prompt: "In a science course, tests are worth $60\\%$ of the grade and homework is worth $40\\%$. Alex scores an average of $80$ on his tests and $95$ on his homework assignments. What is his final weighted mean grade?",
+    prompt: "In science class, tests count for $60\\%$ of the grade and homework counts for $40\\%$. Alex averages $80$ on tests and $95$ on homework. What is his final weighted mean grade?",
     choices: [
       { id: "A", label: "86" },
       { id: "B", label: "87.5" },
