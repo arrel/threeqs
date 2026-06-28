@@ -1,20 +1,59 @@
 import type { Difficulty, Problem } from "@/lib/types";
 
 const DAILY_DIFFICULTIES: Difficulty[] = ["easy", "medium", "stretch"];
+const DAILY_SCHEDULE_START_DATE_KEY = "2026-06-28";
 
 export function selectDailyProblems(allProblems: Problem[], dateKey: string): Problem[] {
   return DAILY_DIFFICULTIES.map((difficulty) => {
-    const candidates = allProblems
-      .filter((problem) => problem.difficulty === difficulty)
-      .sort((a, b) => a.id.localeCompare(b.id));
+    const candidates = allProblems.filter((problem) => problem.difficulty === difficulty);
 
     if (candidates.length === 0) {
       throw new Error(`No ${difficulty} problems are available.`);
     }
 
-    const index = deterministicIndex(`${dateKey}:${difficulty}`, candidates.length);
-    return candidates[index];
+    return selectDailyProblemForDifficulty(candidates, dateKey, difficulty);
   });
+}
+
+function selectDailyProblemForDifficulty(
+  candidates: Problem[],
+  dateKey: string,
+  difficulty: Difficulty
+): Problem {
+  const duplicateScheduledDate = findDuplicateScheduledDate(candidates);
+  if (duplicateScheduledDate) {
+    throw new Error(`Multiple ${difficulty} problems are scheduled for ${duplicateScheduledDate}.`);
+  }
+
+  const datedCandidates = candidates.filter((problem) => problem.scheduledDate === dateKey);
+
+  if (datedCandidates.length === 1) {
+    return datedCandidates[0];
+  }
+
+  const loopCandidates = candidates
+    .filter((problem) => problem.scheduledDate <= dateKey)
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+  const schedule = loopCandidates.length > 0
+    ? loopCandidates
+    : [...candidates].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+  const daysSinceStart = getDateKeyDistanceInDays(DAILY_SCHEDULE_START_DATE_KEY, dateKey);
+
+  return schedule[positiveModulo(daysSinceStart, schedule.length)];
+}
+
+function findDuplicateScheduledDate(problems: Problem[]): string | null {
+  const scheduledDates = new Set<string>();
+
+  for (const problem of problems) {
+    if (scheduledDates.has(problem.scheduledDate)) {
+      return problem.scheduledDate;
+    }
+
+    scheduledDates.add(problem.scheduledDate);
+  }
+
+  return null;
 }
 
 export function deterministicIndex(seed: string, modulo: number): number {
@@ -23,6 +62,24 @@ export function deterministicIndex(seed: string, modulo: number): number {
   }
 
   return hashSeed(seed) % modulo;
+}
+
+function getDateKeyDistanceInDays(startDateKey: string, dateKey: string): number {
+  return dateKeyToUtcDayNumber(dateKey) - dateKeyToUtcDayNumber(startDateKey);
+}
+
+function dateKeyToUtcDayNumber(dateKey: string): number {
+  const [year, month, day] = dateKey.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    throw new Error(`Invalid date key: ${dateKey}`);
+  }
+
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+function positiveModulo(value: number, modulo: number): number {
+  return ((value % modulo) + modulo) % modulo;
 }
 
 // Deterministic Fisher–Yates shuffle. The same seed always produces the same
