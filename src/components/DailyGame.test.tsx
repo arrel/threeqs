@@ -273,7 +273,7 @@ describe("DailyGame", () => {
     // Spend 5 active seconds on the first question, then leave for home.
     clock = 6_000;
     await user.click(screen.getByLabelText("Back"));
-    expect(screen.getByRole("heading", { name: "Three Qs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
 
     // 100 seconds pass while the question is off screen — these must not count.
     clock = 106_000;
