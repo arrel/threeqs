@@ -137,20 +137,22 @@ describe("DailyGame", () => {
   it("opens vocabulary help from underlined prompt words and the topbar help button", async () => {
     const user = userEvent.setup();
     const storage = createMemoryStorage();
-    const today = new Date("2026-06-27T18:00:00Z");
+    const today = new Date("2026-06-28T18:00:00Z");
 
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
     await user.click(getButtonByText(/^play$/i));
 
-    await user.click(screen.getAllByRole("button", { name: /show definition for mean/i })[0]);
+    const promptVocabButton = document.querySelector<HTMLButtonElement>("button.vocab-word");
+    expect(promptVocabButton).not.toBeNull();
+    await user.click(promptVocabButton as HTMLButtonElement);
 
     const vocabDialog = screen.getByRole("dialog", { name: /words to know/i });
     expect(vocabDialog).toBeInTheDocument();
     expect(within(vocabDialog).queryByText(/^Vocabulary$/i)).not.toBeInTheDocument();
-    expect(within(vocabDialog).getByText(/^Mean$/i)).toBeInTheDocument();
-    expect(within(vocabDialog).getByText(/add all the values/i)).toBeInTheDocument();
+    expect(within(vocabDialog).getByText(/^Prime Factorization$/i)).toBeInTheDocument();
+    expect(within(vocabDialog).getByText(/prime numbers multiplied together/i)).toBeInTheDocument();
 
     fireEvent.pointerDown(screen.getByTestId("vocab-backdrop"));
 
