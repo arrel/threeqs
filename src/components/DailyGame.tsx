@@ -1071,21 +1071,19 @@ function HomeScreen({
   const nameLabelId = "student-name-label";
 
   return (
-    <section className="home-card" aria-label="Three Qs home">
-      <div className="home-copy">
-        <h1 className="home-wordmark">
-          Three<span className="home-wordmark-qs">Qs</span>
-        </h1>
-        <p>Your daily math superbowl challenge</p>
+    <section className="game-screen home-card" aria-label="Three Qs home">
+      <div className="screen-body home-body">
+        <div className="home-copy">
+          <h1 className="home-wordmark">
+            Three<span className="home-wordmark-qs">Qs</span>
+          </h1>
+          <p>Your daily math superbowl challenge</p>
+        </div>
+
+        <Leaderboard entries={leaderboard} isLoading={isLeaderboardLoading} />
       </div>
 
-      <div aria-hidden="true" />
-
-      <Leaderboard entries={leaderboard} isLoading={isLeaderboardLoading} />
-
-      <div aria-hidden="true" />
-
-      <form className="home-form" onSubmit={onSubmit}>
+      <form className="screen-footer home-form" onSubmit={onSubmit}>
         <div className="name-field">
           <span className="name-field-label" id={nameLabelId}>
             Your Name
@@ -1250,8 +1248,8 @@ function QuestionScreen({
   );
 
   return (
-    <section className="quiz-card" aria-label="Question screen">
-      <div className="quiz-content">
+    <section className="game-screen quiz-card" aria-label="Question screen">
+      <div className="screen-body quiz-content">
         <div className="quiz-prompt">
           <MathText onVocabTermSelect={onOpenVocabSheet} text={problem.prompt} vocabTerms={vocabTerms} />
         </div>
@@ -1294,7 +1292,7 @@ function QuestionScreen({
         </div>
       </div>
 
-      <div className="quiz-footer">
+      <div className="screen-footer quiz-footer">
         {isViewingSavedAnswer ? (
           <button className="primary-action check-action" onClick={onNext} type="button">
             <ArrowRight size={19} />
@@ -1520,7 +1518,7 @@ function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
   const medalLabel = getMedalLabel(result.medal);
 
   return (
-    <section className="score-card" aria-label="Completion score">
+    <section className="game-screen score-card" aria-label="Completion score">
       <div className="card-body">
         <div className={`medal-emblem ${result.medal}`}>
           {result.medal === "gold" ? <Trophy size={54} /> : <Medal size={54} />}
@@ -1570,7 +1568,7 @@ type StreakScreenProps = {
 
 function StreakScreen({ onContinue, streak }: StreakScreenProps) {
   return (
-    <section className="streak-card" aria-label="Current streak">
+    <section className="game-screen streak-card" aria-label="Current streak">
       <div className="card-body">
         <div className="streak-burst" aria-hidden="true">
           <Flame size={86} fill="currentColor" />
