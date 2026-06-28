@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Medal, Pencil, Play, Trophy } from "lucide-react";
-import { FormEvent, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, X } from "lucide-react";
+import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AnimationEvent as ReactAnimationEvent, PointerEvent as ReactPointerEvent } from "react";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
@@ -32,7 +33,7 @@ import {
   type StorageLike
 } from "@/lib/storage";
 import { formatElapsedSeconds } from "@/lib/time";
-import type { DailyResult, Problem, QuestionResult } from "@/lib/types";
+import type { DailyResult, Problem, QuestionResult, VocabTerm } from "@/lib/types";
 
 type DailyGameProps = {
   onRouteChange?(route: GameRoute, navigation?: RouteNavigation): void;
@@ -42,6 +43,8 @@ type DailyGameProps = {
 };
 
 type GameMode = "home" | "quiz" | "review" | "score" | "streak";
+
+const VOCAB_SHEET_EXIT_MS = 290;
 
 export function DailyGame({ onRouteChange, route, today, storage }: DailyGameProps) {
   const dateKey = useMemo(() => getPacificDateKey(today), [today]);
@@ -58,6 +61,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   const [currentResult, setCurrentResult] = useState<DailyResult | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [questionStart, setQuestionStart] = useState(() => performance.now());
+  const [timerPausedAt, setTimerPausedAt] = useState<number | null>(null);
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [attemptedChoiceIds, setAttemptedChoiceIds] = useState<string[]>([]);
   const [checkedResult, setCheckedResult] = useState<QuestionResult | null>(null);
@@ -70,6 +74,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(shouldUseRemoteResults);
   const [isHomeHistoryLoading, setIsHomeHistoryLoading] = useState(shouldUseRemoteResults);
   const [isEditingName, setIsEditingName] = useState(false);
+  const timerPausedAtRef = useRef<number | null>(null);
   const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
@@ -466,6 +471,8 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
 
   function startQuestion() {
     const start = performance.now();
+    timerPausedAtRef.current = null;
+    setTimerPausedAt(null);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
@@ -479,7 +486,9 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     }
 
     const answeredAt = performance.now();
-    const exactElapsedSeconds = Math.max(0, (answeredAt - questionStart) / 1000);
+    const activePauseMilliseconds =
+      timerPausedAtRef.current === null ? 0 : Math.max(0, answeredAt - timerPausedAtRef.current);
+    const exactElapsedSeconds = Math.max(0, (answeredAt - questionStart - activePauseMilliseconds) / 1000);
     const nextSelectedChoiceIds = [...attemptedChoiceIds, selectedChoiceId];
     const solved = selectedChoiceId === currentProblem.correctChoiceId;
     const nextResult = scoreQuestion({
@@ -628,6 +637,8 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }
 
   function moveToQuestion(index: number, results: QuestionResult[]) {
+    timerPausedAtRef.current = null;
+    setTimerPausedAt(null);
     setCurrentIndex(index);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
@@ -673,6 +684,8 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }
 
   function handleStreakContinue() {
+    timerPausedAtRef.current = null;
+    setTimerPausedAt(null);
     setCurrentResult(null);
     setQuestionResults([]);
     setSelectedChoiceId(null);
@@ -689,6 +702,30 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
 
     setMode("home");
     navigateTo({ screen: "home" });
+  }
+
+  function handleTimerPauseChange(isPaused: boolean) {
+    if (isPaused) {
+      if (timerPausedAtRef.current !== null) {
+        return;
+      }
+
+      const pausedAt = performance.now();
+      timerPausedAtRef.current = pausedAt;
+      setTimerPausedAt(pausedAt);
+      return;
+    }
+
+    const pausedAt = timerPausedAtRef.current;
+
+    if (pausedAt === null) {
+      return;
+    }
+
+    const pausedMilliseconds = Math.max(0, performance.now() - pausedAt);
+    timerPausedAtRef.current = null;
+    setTimerPausedAt(null);
+    setQuestionStart((start) => start + pausedMilliseconds);
   }
 
   return (
@@ -722,6 +759,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
           onExplain={handleExplainQuestion}
           onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
           onSelectChoice={setSelectedChoiceId}
+          onTimerPauseChange={handleTimerPauseChange}
           onTryAgain={handleTryAgain}
           problem={currentProblem}
           questionStart={questionStart}
@@ -729,6 +767,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
           reviewResult={mode === "review" ? currentResult?.questionResults[currentIndex] ?? null : null}
           savedResult={mode === "quiz" ? getQuestionResultAt(questionResults, currentIndex) : null}
           selectedChoiceId={selectedChoiceId}
+          timerPausedAt={timerPausedAt}
           totalQuestions={dailyProblems.length}
         />
       ) : null}
@@ -910,6 +949,7 @@ type QuestionScreenProps = {
   onExplain(): void;
   onNext(): void;
   onSelectChoice(choiceId: string): void;
+  onTimerPauseChange(isPaused: boolean): void;
   onTryAgain(): void;
   problem: Problem;
   questionStart: number;
@@ -917,6 +957,7 @@ type QuestionScreenProps = {
   reviewResult: QuestionResult | null;
   savedResult: QuestionResult | null;
   selectedChoiceId: string | null;
+  timerPausedAt: number | null;
   totalQuestions: number;
 };
 
@@ -930,6 +971,7 @@ function QuestionScreen({
   onExplain,
   onNext,
   onSelectChoice,
+  onTimerPauseChange,
   onTryAgain,
   problem,
   questionStart,
@@ -937,8 +979,12 @@ function QuestionScreen({
   reviewResult,
   savedResult,
   selectedChoiceId,
+  timerPausedAt,
   totalQuestions
 }: QuestionScreenProps) {
+  const [isVocabOpen, setIsVocabOpen] = useState(false);
+  const [isVocabClosing, setIsVocabClosing] = useState(false);
+  const [selectedVocabTerm, setSelectedVocabTerm] = useState<VocabTerm | null>(null);
   const displayResult = isReview ? reviewResult : savedResult ?? result;
   const displayAttemptedChoiceIds = isReview
     ? reviewResult?.selectedChoiceIds ?? []
@@ -956,6 +1002,7 @@ function QuestionScreen({
       !isCurrentQuestionFinalized &&
       displayResult.attemptsUsed < MAX_ATTEMPTS
   );
+  const vocabTerms = problem.vocabTerms ?? [];
 
   // Shuffle choices deterministically per problem so the order is randomized
   // but stays stable across re-renders, attempts, navigation, and review.
@@ -963,6 +1010,55 @@ function QuestionScreen({
     () => shuffleWithSeed(problem.choices, problem.id),
     [problem.id, problem.choices]
   );
+
+  useEffect(() => {
+    setIsVocabOpen(false);
+    setIsVocabClosing(false);
+    setSelectedVocabTerm(null);
+  }, [problem.id]);
+
+  useEffect(() => {
+    if (!isVocabClosing) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(handleVocabSheetExited, VOCAB_SHEET_EXIT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [isVocabClosing]);
+
+  function openVocabSheet(term: VocabTerm | null = null) {
+    if (vocabTerms.length === 0) {
+      return;
+    }
+
+    setSelectedVocabTerm(term ?? vocabTerms[0]);
+
+    if (isVocabClosing) {
+      onTimerPauseChange(true);
+      setIsVocabClosing(false);
+      return;
+    }
+
+    if (!isVocabOpen) {
+      onTimerPauseChange(true);
+      setIsVocabOpen(true);
+    }
+  }
+
+  function closeVocabSheet() {
+    if (!isVocabOpen || isVocabClosing) {
+      return;
+    }
+
+    onTimerPauseChange(false);
+    setIsVocabClosing(true);
+  }
+
+  function handleVocabSheetExited() {
+    setIsVocabOpen(false);
+    setIsVocabClosing(false);
+    setSelectedVocabTerm(null);
+  }
 
   return (
     <section className="app-card quiz-card" aria-label="Question screen">
@@ -986,16 +1082,30 @@ function QuestionScreen({
           ))}
         </div>
 
-        <TimerPill
-          key={`${currentIndex}-${questionStart}`}
-          frozenSeconds={displayResult?.elapsedSeconds}
-          startedAt={questionStart}
-        />
+        <div className="quiz-tools">
+          {vocabTerms.length > 0 ? (
+            <button
+              aria-label="Open vocabulary help"
+              className="vocab-help-btn"
+              onClick={() => openVocabSheet()}
+              type="button"
+            >
+              <HelpCircle size={18} />
+            </button>
+          ) : null}
+
+          <TimerPill
+            key={`${currentIndex}-${questionStart}`}
+            frozenSeconds={displayResult?.elapsedSeconds}
+            pausedAt={timerPausedAt}
+            startedAt={questionStart}
+          />
+        </div>
       </header>
 
       <div className="quiz-content">
         <div className="quiz-prompt">
-          <MathText text={problem.prompt} />
+          <MathText onVocabTermSelect={openVocabSheet} text={problem.prompt} vocabTerms={vocabTerms} />
         </div>
 
         <div className="answer-grid">
@@ -1067,15 +1177,27 @@ function QuestionScreen({
           result={result}
         />
       ) : null}
+
+      {isVocabOpen && vocabTerms.length > 0 ? (
+        <VocabSheet
+          isClosing={isVocabClosing}
+          onClose={closeVocabSheet}
+          onExited={handleVocabSheetExited}
+          selectedTerm={selectedVocabTerm}
+          terms={vocabTerms}
+        />
+      ) : null}
     </section>
   );
 }
 
 const TimerPill = memo(function TimerPill({
   frozenSeconds,
+  pausedAt,
   startedAt
 }: {
   frozenSeconds?: number;
+  pausedAt: number | null;
   startedAt: number;
 }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(() => getElapsedSeconds(startedAt));
@@ -1089,12 +1211,17 @@ const TimerPill = memo(function TimerPill({
       return undefined;
     }
 
+    if (pausedAt !== null) {
+      setElapsedSeconds(getElapsedSeconds(startedAt, pausedAt));
+      return undefined;
+    }
+
     const updateElapsed = () => setElapsedSeconds(getElapsedSeconds(startedAt));
     updateElapsed();
 
     const interval = window.setInterval(updateElapsed, 200);
     return () => window.clearInterval(interval);
-  }, [frozenSeconds, startedAt]);
+  }, [frozenSeconds, pausedAt, startedAt]);
 
   return (
     <div className={`timer-pill ${digitClass}`} aria-label={`${displaySeconds} seconds elapsed`}>
@@ -1104,8 +1231,8 @@ const TimerPill = memo(function TimerPill({
   );
 });
 
-function getElapsedSeconds(startedAt: number): number {
-  return Math.max(0, (performance.now() - startedAt) / 1000);
+function getElapsedSeconds(startedAt: number, currentTime = performance.now()): number {
+  return Math.max(0, (currentTime - startedAt) / 1000);
 }
 
 function toWholeSeconds(seconds: number): number {
@@ -1122,6 +1249,128 @@ function getTimerDigitClass(seconds: number): "digits-1" | "digits-2" | "minutes
   }
 
   return "digits-1";
+}
+
+type VocabSheetProps = {
+  isClosing: boolean;
+  onClose(): void;
+  onExited(): void;
+  selectedTerm: VocabTerm | null;
+  terms: VocabTerm[];
+};
+
+function VocabSheet({ isClosing, onClose, onExited, selectedTerm, terms }: VocabSheetProps) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const swipeStartYRef = useRef<number | null>(null);
+  const swipeLatestYRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus({ preventScroll: true });
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  function handleBackdropPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  }
+
+  function handleSheetPointerDown(event: ReactPointerEvent<HTMLElement>) {
+    if (event.pointerType !== "touch") {
+      return;
+    }
+
+    swipeStartYRef.current = event.clientY;
+    swipeLatestYRef.current = event.clientY;
+  }
+
+  function handleSheetPointerMove(event: ReactPointerEvent<HTMLElement>) {
+    if (swipeStartYRef.current === null) {
+      return;
+    }
+
+    swipeLatestYRef.current = event.clientY;
+  }
+
+  function handleSheetPointerUp(event: ReactPointerEvent<HTMLElement>) {
+    const swipeStartY = swipeStartYRef.current;
+    const swipeLatestY = swipeLatestYRef.current;
+
+    swipeStartYRef.current = null;
+    swipeLatestYRef.current = null;
+
+    if (swipeStartY === null || swipeLatestY === null) {
+      return;
+    }
+
+    if (swipeLatestY - swipeStartY > 76) {
+      onClose();
+    }
+  }
+
+  function handleSheetAnimationEnd(event: ReactAnimationEvent<HTMLElement>) {
+    if (isClosing && event.animationName === "vocab-sheet-slide-down") {
+      onExited();
+    }
+  }
+
+  return (
+    <div
+      className={["vocab-dialog-backdrop", isClosing ? "closing" : ""].filter(Boolean).join(" ")}
+      data-testid="vocab-backdrop"
+      onPointerDown={handleBackdropPointerDown}
+    >
+      <section
+        aria-labelledby="vocab-sheet-title"
+        aria-modal="true"
+        className={["vocab-sheet", isClosing ? "closing" : ""].filter(Boolean).join(" ")}
+        data-testid="vocab-sheet"
+        onAnimationEnd={handleSheetAnimationEnd}
+        onPointerDown={handleSheetPointerDown}
+        onPointerMove={handleSheetPointerMove}
+        onPointerUp={handleSheetPointerUp}
+        role="dialog"
+      >
+        <div className="vocab-sheet-grabber" aria-hidden="true" />
+        <header className="vocab-sheet-header">
+          <div>
+            <h2 id="vocab-sheet-title">Words to Know</h2>
+          </div>
+          <button
+            aria-label="Close vocabulary help"
+            className="vocab-close-btn"
+            onClick={onClose}
+            ref={closeButtonRef}
+            type="button"
+          >
+            <X size={22} />
+          </button>
+        </header>
+
+        <div className="vocab-term-list">
+          {terms.map((term) => (
+            <article
+              className={["vocab-term-card", selectedTerm?.term === term.term ? "selected" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              key={term.term}
+            >
+              <h3>{term.term}</h3>
+              <p>{term.definition}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 type FeedbackSheetProps = {
