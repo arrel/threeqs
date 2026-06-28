@@ -1049,6 +1049,7 @@ function QuestionScreen({
     : savedResult?.selectedChoiceIds.at(-1) ?? selectedChoiceId;
   const isViewingSavedAnswer = Boolean(isReview || savedResult);
   const displayIsFinalized = Boolean(isViewingSavedAnswer || isCurrentQuestionFinalized);
+  const promptSizeClass = getPromptSizeClass(problem.prompt);
   const canTryAgain = Boolean(
     !isReview &&
       !savedResult &&
@@ -1157,7 +1158,7 @@ function QuestionScreen({
       </header>
 
       <div className="quiz-content">
-        <div className="quiz-prompt">
+        <div className={["quiz-prompt", promptSizeClass].filter(Boolean).join(" ")}>
           <MathText onVocabTermSelect={openVocabSheet} text={problem.prompt} vocabTerms={vocabTerms} />
         </div>
 
@@ -1441,6 +1442,25 @@ function getAttemptLabel(result: QuestionResult): string {
   }
 
   return result.attemptsUsed === 1 ? "First try" : "Second try";
+}
+
+function getPromptSizeClass(prompt: string): string {
+  const displayLength = prompt
+    .replace(/\$+/g, "")
+    .replace(/\\([a-zA-Z]+|.)/g, "$1")
+    .replace(/[{}]/g, "")
+    .replace(/\s+/g, " ")
+    .trim().length;
+
+  if (displayLength >= 175) {
+    return "prompt-extra-long";
+  }
+
+  if (displayLength >= 115) {
+    return "prompt-long";
+  }
+
+  return "";
 }
 
 type StreakScreenProps = {
