@@ -25,13 +25,13 @@ export const problems: Problem[] = [
       { id: "D", label: "$9 \\cdot 10$" }
     ],
     correctChoiceId: "B",
-    explanation: "$90 = 9 \\cdot 10 = 3^2 \\cdot 2 \\cdot 5 = 2 \\cdot 3^2 \\cdot 5$.",
+    explanation: "Break $90$ into factors: $90 = 9 \\cdot 10$. Then $9 = 3^2$ and $10 = 2 \\cdot 5$, so $90 = 2 \\cdot 3^2 \\cdot 5$.",
     difficulty: "easy",
     topics: ["number theory", "prime factorization"],
     vocabTerms: [
       {
         term: "Prime Factorization",
-        definition: "Breaking down a composite number into a product of prime numbers."
+        definition: "Writing a number as prime numbers multiplied together."
       }
     ],
     gradeBand: "6",
@@ -49,13 +49,13 @@ export const problems: Problem[] = [
       { id: "D", label: "120" }
     ],
     correctChoiceId: "B",
-    explanation: "The problem asks for the greatest common factor (GCF) of $48$ and $60$. Factors of $48$: $1,2,3,4,6,8,12,16,24,48$. Factors of $60$: $1,2,3,4,5,6,10,12,15,20,30,60$. The largest shared factor is $12$.",
+    explanation: "Each bin has to be the same, with no leftovers. That means we need the greatest common factor of $48$ and $60$. The biggest number that divides both is $12$, so she can make $12$ bins.",
     difficulty: "medium",
     topics: ["number theory", "gcf"],
     vocabTerms: [
       {
         term: "Greatest Common Factor",
-        definition: "The largest whole number that divides evenly into two or more numbers.",
+        definition: "The largest whole number that divides evenly into each number.",
         aliases: ["gcf"]
       }
     ],
@@ -74,13 +74,13 @@ export const problems: Problem[] = [
       { id: "D", label: "$4^2$" }
     ],
     correctChoiceId: "B",
-    explanation: "Convert all terms to base 2: $4^3 = (2^2)^3 = 2^6$, and $8^2 = (2^3)^2 = 2^6$. The expression becomes $\\frac{2^5 \\cdot 2^6}{2^6} = 2^5$.",
+    explanation: "Rewrite everything using base $2$. Since $4^3 = (2^2)^3 = 2^6$ and $8^2 = (2^3)^2 = 2^6$, the expression becomes $\\frac{2^5 \\cdot 2^6}{2^6} = 2^5$.",
     difficulty: "stretch",
     topics: ["number theory", "exponents"],
     vocabTerms: [
       {
         term: "Exponent",
-        definition: "A number representing how many times the base is multiplied by itself."
+        definition: "The small raised number that tells how many times to multiply the base."
       }
     ],
     gradeBand: "7-8",
@@ -102,13 +102,13 @@ export const problems: Problem[] = [
       { id: "D", label: "$22.50" }
     ],
     correctChoiceId: "C",
-    explanation: "The unit rate is $12.50 \\div 5 = $2.50$ per pound. For $8$ pounds: $8 \\cdot 2.50 = $20.00$.",
+    explanation: "First find the price for $1$ pound: $12.50 \\div 5 = 2.50$. Then multiply by $8$: $8 \\cdot 2.50 = 20.00$.",
     difficulty: "easy",
     topics: ["proportional reasoning", "unit rate"],
     vocabTerms: [
       {
         term: "Unit Rate",
-        definition: "A rate comparing an amount to exactly one unit of another quantity."
+        definition: "A rate for $1$ of something, like the cost for $1$ pound."
       }
     ],
     gradeBand: "6",
@@ -126,13 +126,13 @@ export const problems: Problem[] = [
       { id: "D", label: "45 minutes" }
     ],
     correctChoiceId: "B",
-    explanation: "$\\text{Time} = \\frac{\\text{Distance}}{\\text{Speed}} = \\frac{45}{75} = \\frac{3}{5}$ of an hour. Convert to minutes: $\\frac{3}{5} \\cdot 60 = 36$ minutes.",
+    explanation: "At $75$ miles per hour, the time is $45 \\div 75 = \\frac{3}{5}$ of an hour. Since an hour has $60$ minutes, $\\frac{3}{5} \\cdot 60 = 36$ minutes.",
     difficulty: "medium",
     topics: ["proportional reasoning", "speed"],
     vocabTerms: [
       {
         term: "Constant Speed",
-        definition: "Speed that does not change over time."
+        definition: "A speed that stays the same the whole time."
       }
     ],
     gradeBand: "6-7",
@@ -150,13 +150,13 @@ export const problems: Problem[] = [
       { id: "D", label: "$120" }
     ],
     correctChoiceId: "B",
-    explanation: "First discount: $150 \\cdot (1 - 0.20) = 150 \\cdot 0.80 = 120$. Second discount: $120 \\cdot (1 - 0.10) = 120 \\cdot 0.90 = 108$.",
+    explanation: "The first discount leaves $80\\%$ of the price: $150 \\cdot 0.80 = 120$. The coupon takes $10\\%$ off that sale price, so $120 \\cdot 0.90 = 108$.",
     difficulty: "stretch",
     topics: ["proportional reasoning", "percent"],
     vocabTerms: [
       {
         term: "Discount",
-        definition: "A reduction in the original selling price of an item."
+        definition: "An amount taken off a price."
       }
     ],
     gradeBand: "7-8",
@@ -178,13 +178,13 @@ export const problems: Problem[] = [
       { id: "D", label: "$(-2, -2)$" }
     ],
     correctChoiceId: "A",
-    explanation: "New x-coordinate: $-3 + 5 = 2$. New y-coordinate: $4 - 6 = -2$. The point becomes $(2, -2)$.",
+    explanation: "Moving right $5$ adds $5$ to the $x$-coordinate: $-3 + 5 = 2$. Moving down $6$ subtracts $6$ from the $y$-coordinate: $4 - 6 = -2$. The new point is $(2, -2)$.",
     difficulty: "easy",
     topics: ["pre-algebra", "coordinate plane"],
     vocabTerms: [
       {
         term: "Coordinate Plane",
-        definition: "A two-dimensional grid formed by the intersection of a horizontal x-axis and vertical y-axis."
+        definition: "A grid with an $x$-axis and a $y$-axis, used to locate points."
       }
     ],
     gradeBand: "6",
@@ -208,7 +208,7 @@ export const problems: Problem[] = [
     vocabTerms: [
       {
         term: "Linear Equation",
-        definition: "An algebraic equation where each term is either a constant or a variable raised to the first power."
+        definition: "An equation where the variable is not squared, cubed, or raised to another power."
       }
     ],
     gradeBand: "6-7",
@@ -226,13 +226,13 @@ export const problems: Problem[] = [
       { id: "D", label: "$x > 5$" }
     ],
     correctChoiceId: "B",
-    explanation: "Subtract $7$ from both sides: $-3x < 15$. Divide by $-3$ and flip the inequality sign: $x > -5$.",
+    explanation: "Subtract $7$ from both sides to get $-3x < 15$. When you divide by a negative number, flip the sign: $x > -5$.",
     difficulty: "stretch",
     topics: ["pre-algebra", "inequalities"],
     vocabTerms: [
       {
         term: "Inequality",
-        definition: "A mathematical statement comparing two quantities that are not necessarily equal using signs like < or >."
+        definition: "A math statement that compares two values using signs like $<$ or $>$."
       }
     ],
     gradeBand: "7-8",
@@ -254,13 +254,13 @@ export const problems: Problem[] = [
       { id: "D", label: "3 cm, 8 cm, 12 cm" }
     ],
     correctChoiceId: "C",
-    explanation: "By the Triangle Inequality Theorem, the sum of any two sides must be greater than the third side. $5 + 7 = 12 > 11$, which passes.",
+    explanation: "For a triangle, any two side lengths must add up to more than the third side. For $5$, $7$, and $11$, we have $5 + 7 = 12$, and $12$ is greater than $11$, so these lengths work.",
     difficulty: "easy",
     topics: ["geometry", "triangle inequality"],
     vocabTerms: [
       {
         term: "Triangle Inequality Theorem",
-        definition: "A rule stating that the sum of the lengths of any two sides of a triangle must be strictly greater than the length of the remaining side."
+        definition: "A rule that says any two sides of a triangle must add up to more than the third side."
       }
     ],
     gradeBand: "6",
@@ -278,13 +278,13 @@ export const problems: Problem[] = [
       { id: "D", label: "120 sq cm" }
     ],
     correctChoiceId: "B",
-    explanation: "Area of the rectangle: $10 \\cdot 6 = 60$ sq cm. Area of the triangle: $\\frac{1}{2} \\cdot 4 \\cdot 6 = 12$ sq cm. Total area: $60 + 12 = 72$ sq cm.",
+    explanation: "Find each part, then add. The rectangle has area $10 \\cdot 6 = 60$ sq cm. The triangle has area $\\frac{1}{2} \\cdot 4 \\cdot 6 = 12$ sq cm. Total area is $60 + 12 = 72$ sq cm.",
     difficulty: "medium",
     topics: ["geometry", "area"],
     vocabTerms: [
       {
         term: "Composite Shape",
-        definition: "A figure made up of two or more simpler geometric structures."
+        definition: "A shape made by putting two or more simpler shapes together."
       }
     ],
     gradeBand: "6-7",
@@ -302,13 +302,13 @@ export const problems: Problem[] = [
       { id: "D", label: "200 sq cm" }
     ],
     correctChoiceId: "C",
-    explanation: "Surface area formula: $2(lw + lh + wh) = 2(5\\cdot4 + 5\\cdot8 + 4\\cdot8) = 2(20 + 40 + 32) = 2(92) = 184$ sq cm.",
+    explanation: "Surface area counts all the outside faces. Use $2(lw + lh + wh)$: $2(5\\cdot4 + 5\\cdot8 + 4\\cdot8) = 2(20 + 40 + 32) = 184$ sq cm.",
     difficulty: "stretch",
     topics: ["geometry", "surface area"],
     vocabTerms: [
       {
         term: "Surface Area",
-        definition: "The total area of all external faces belonging to a three-dimensional solid."
+        definition: "The total area of all the outside faces of a 3D shape."
       }
     ],
     gradeBand: "7-8",
@@ -330,13 +330,13 @@ export const problems: Problem[] = [
       { id: "D", label: "24" }
     ],
     correctChoiceId: "D",
-    explanation: "By the Fundamental Counting Principle, multiply the choice options together: $4 \\cdot 3 \\cdot 2 = 24$.",
+    explanation: "Choose a shirt, then pants, then shoes. Multiply the number of choices: $4 \\cdot 3 \\cdot 2 = 24$ outfits.",
     difficulty: "easy",
     topics: ["combinatorics", "counting"],
     vocabTerms: [
       {
         term: "Fundamental Counting Principle",
-        definition: "A method using multiplication to find the total number of outcomes when combining multiple independent choices."
+        definition: "A shortcut for counting choices: multiply the number of options for each step."
       }
     ],
     gradeBand: "6",
@@ -354,13 +354,13 @@ export const problems: Problem[] = [
       { id: "D", label: "25" }
     ],
     correctChoiceId: "B",
-    explanation: "Total unique student athletes = $(\\text{Country only}) + (\\text{Basketball only}) + (\\text{Both}) = (17 - 5) + (13 - 5) + 5 = 12 + 8 + 5 = 25$. Non-athletes: $30 - 25 = 5$.",
+    explanation: "The $5$ students in both sports are counted in both groups, so subtract them once: $17 + 13 - 5 = 25$ students play at least one sport. That leaves $30 - 25 = 5$ students in neither sport.",
     difficulty: "medium",
     topics: ["logic", "venn diagram"],
     vocabTerms: [
       {
         term: "Venn Diagram",
-        definition: "An overlapping circle graphic showing logical relationships and shared elements among distinct sets."
+        definition: "A diagram with overlapping circles that shows what groups have in common."
       }
     ],
     gradeBand: "6-7",
@@ -378,13 +378,13 @@ export const problems: Problem[] = [
       { id: "D", label: "256" }
     ],
     correctChoiceId: "B",
-    explanation: "This is a permutation of $4$ unique items: $4! = 4 \\cdot 3 \\cdot 2 \\cdot 1 = 24$.",
+    explanation: "There are $4$ choices for the first letter, then $3$, then $2$, then $1$. So the number of arrangements is $4 \\cdot 3 \\cdot 2 \\cdot 1 = 24$.",
     difficulty: "stretch",
     topics: ["combinatorics", "permutations"],
     vocabTerms: [
       {
         term: "Permutation",
-        definition: "An ordered arrangement of elements where the specific sequential position matters."
+        definition: "An arrangement where order matters."
       }
     ],
     gradeBand: "7-8",
@@ -406,13 +406,13 @@ export const problems: Problem[] = [
       { id: "D", label: "$\\frac{2}{3}$" }
     ],
     correctChoiceId: "A",
-    explanation: "The events are independent. $P(4) = \\frac{1}{6}$ and $P(\\text{heads}) = \\frac{1}{2}$. Combined probability: $\\frac{1}{6} \\cdot \\frac{1}{2} = \\frac{1}{12}$.",
+    explanation: "Rolling the die does not change the coin flip. The chance of rolling a $4$ is $\\frac{1}{6}$, and the chance of heads is $\\frac{1}{2}$. Multiply: $\\frac{1}{6} \\cdot \\frac{1}{2} = \\frac{1}{12}$.",
     difficulty: "easy",
     topics: ["probability", "independent events"],
     vocabTerms: [
       {
         term: "Independent Events",
-        definition: "Events where the outcome of the first event has no impact on the probability of the second event occurring."
+        definition: "Events where one result does not change the chance of the other result."
       }
     ],
     gradeBand: "6",
@@ -430,13 +430,13 @@ export const problems: Problem[] = [
       { id: "D", label: "90" }
     ],
     correctChoiceId: "A",
-    explanation: "Weighted Mean = $(80 \\cdot 0.60) + (95 \\cdot 0.40) = 48 + 38 = 86$.",
+    explanation: "Tests count more than homework, so multiply each score by its weight. Tests: $80 \\cdot 0.60 = 48$. Homework: $95 \\cdot 0.40 = 38$. Add them: $48 + 38 = 86$.",
     difficulty: "medium",
     topics: ["statistics", "weighted mean"],
     vocabTerms: [
       {
         term: "Weighted Mean",
-        definition: "An average calculated by multiplying each value by a specific weight coefficient reflecting its relative importance."
+        definition: "An average where some parts count more than others."
       }
     ],
     gradeBand: "6-7",
@@ -446,7 +446,7 @@ export const problems: Problem[] = [
   {
     id: "stretch-dependent-tokens",
     scheduledDate: "2026-07-03",
-    prompt: "A box contains $5$ red tokens and $5$ blue tokens. Two tokens are drawn sequentially without replacement. What is the probability that both tokens drawn are red?",
+    prompt: "A box contains $5$ red tokens and $5$ blue tokens. Two tokens are drawn one after the other without replacement. What is the probability that both tokens drawn are red?",
     choices: [
       { id: "A", label: "$\\frac{1}{4}$" },
       { id: "B", label: "$\\frac{2}{9}$" },
@@ -454,13 +454,13 @@ export const problems: Problem[] = [
       { id: "D", label: "$\\frac{5}{18}$" }
     ],
     correctChoiceId: "B",
-    explanation: "First pull: $P(\\text{Red}) = \\frac{5}{10} = \\frac{1}{2}$. Second pull (dependent, 9 remaining): $P(\\text{Red}) = \\frac{4}{9}$. Final probability: $\\frac{1}{2} \\cdot \\frac{4}{9} = \\frac{4}{18} = \\frac{2}{9}$.",
+    explanation: "For the first token, the chance of red is $\\frac{5}{10} = \\frac{1}{2}$. If the first token is red, then $4$ red tokens are left out of $9$ total tokens. Multiply: $\\frac{1}{2} \\cdot \\frac{4}{9} = \\frac{2}{9}$.",
     difficulty: "stretch",
     topics: ["probability", "dependent events"],
     vocabTerms: [
       {
         term: "Dependent Events",
-        definition: "Events where the outcome of the initial action alters the sample space and conditional probability of successive actions."
+        definition: "Events where the first result changes what can happen next."
       }
     ],
     gradeBand: "7-8",

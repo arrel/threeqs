@@ -152,7 +152,7 @@ describe("DailyGame", () => {
     expect(vocabDialog).toBeInTheDocument();
     expect(within(vocabDialog).queryByText(/^Vocabulary$/i)).not.toBeInTheDocument();
     expect(within(vocabDialog).getByText(/^Prime Factorization$/i)).toBeInTheDocument();
-    expect(within(vocabDialog).getByText(/breaking down a composite number/i)).toBeInTheDocument();
+    expect(within(vocabDialog).getByText(/prime numbers multiplied together/i)).toBeInTheDocument();
 
     fireEvent.pointerDown(screen.getByTestId("vocab-backdrop"));
 
