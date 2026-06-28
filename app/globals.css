@@ -102,7 +102,7 @@ button:disabled {
 .home-card {
   grid-template-rows: auto 1fr auto 1fr auto 1fr auto;
   gap: 0;
-  padding: clamp(20px, 5vw, 32px) clamp(18px, 5vw, 32px) 24px;
+  padding: 24px clamp(18px, 5vw, 32px) 24px;
 }
 
 .home-topbar {
@@ -1211,6 +1211,10 @@ button:disabled {
   }
 
   .quiz-card {
+    padding-top: 18px;
+  }
+
+  .home-card {
     padding-top: 18px;
   }
 
