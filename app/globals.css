@@ -221,7 +221,7 @@ button:disabled {
 
 .leaderboard-body {
   display: grid;
-  align-content: center;
+  align-content: start;
   min-height: 252px;
 }
 
