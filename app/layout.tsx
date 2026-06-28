@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { RoutedDailyGame } from "@/components/RoutedDailyGame";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,7 +22,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <RoutedDailyGame />
+        {children}
+      </body>
     </html>
   );
 }
