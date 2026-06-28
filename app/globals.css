@@ -128,6 +128,10 @@ button:disabled {
   line-height: 0.9;
 }
 
+.home-wordmark-qs {
+  color: var(--yellow-strong);
+}
+
 .home-copy p,
 .score-copy p,
 .streak-copy p {
