@@ -778,10 +778,13 @@ button:disabled {
 .quiz-prompt {
   grid-row: 1;
   display: grid;
+  align-self: center;
+  width: 100%;
+  max-height: calc(100% - clamp(28px, 6svh, 56px));
   min-height: 0;
   place-items: center;
   margin: 0 auto;
-  padding: 12px 0;
+  padding: clamp(16px, 3svh, 28px) 0;
   max-width: 22rem;
   overflow: auto;
   font-size: clamp(1.7rem, 7vw, 2.55rem);
@@ -820,6 +823,7 @@ button:disabled {
   gap: 10px;
   align-items: center;
   min-height: 70px;
+  height: auto;
   padding: 12px 14px;
   border: 1.5px solid var(--line-strong);
   border-radius: 999px;
@@ -872,6 +876,7 @@ button:disabled {
 .answer-text {
   min-width: 0;
   font-weight: 600;
+  line-height: 1.18;
   overflow-wrap: anywhere;
 }
 
