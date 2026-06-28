@@ -128,8 +128,12 @@ button:disabled {
   line-height: 0.9;
 }
 
+.home-copy h1.home-wordmark {
+    letter-spacing: -.03em;
+}
 .home-wordmark-qs {
   color: var(--yellow-strong);
+  margin-left: .06em;
 }
 
 .home-copy p,
