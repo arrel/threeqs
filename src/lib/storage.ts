@@ -1,9 +1,11 @@
 import { previousDateKey } from "@/lib/date";
+import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
 import type { DailyResult, QuestionResult } from "@/lib/types";
 
 const STORAGE_KEY = "msb-daily-results-v1";
 const PROFILE_KEY = "three-qs-profile-v1";
 const DRAFT_KEY = "three-qs-daily-draft-v1";
+const LEADERBOARD_KEY = "three-qs-leaderboard-v1";
 
 export type StorageLike = {
   getItem(key: string): string | null;
@@ -19,6 +21,11 @@ type StoredPayload = {
 type StoredProfile = {
   version: 1;
   studentName: string;
+};
+
+type StoredLeaderboard = {
+  version: 1;
+  entries: LeaderboardEntry[];
 };
 
 export type DailyDraft = {
@@ -129,6 +136,45 @@ export function saveStudentName(name: string, storage = getBrowserStorage()): vo
       version: 1,
       studentName
     } satisfies StoredProfile)
+  );
+}
+
+export function getCachedLeaderboard(storage = getBrowserStorage()): LeaderboardEntry[] | null {
+  if (!storage) {
+    return null;
+  }
+
+  const raw = storage.getItem(LEADERBOARD_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as StoredLeaderboard;
+    if (parsed.version !== 1 || !Array.isArray(parsed.entries)) {
+      return null;
+    }
+
+    return parsed.entries;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCachedLeaderboard(
+  entries: LeaderboardEntry[],
+  storage = getBrowserStorage()
+): void {
+  if (!storage) {
+    return;
+  }
+
+  storage.setItem(
+    LEADERBOARD_KEY,
+    JSON.stringify({
+      version: 1,
+      entries
+    } satisfies StoredLeaderboard)
   );
 }
 
