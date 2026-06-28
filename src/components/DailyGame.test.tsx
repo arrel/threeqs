@@ -5,7 +5,13 @@ import { DailyGame } from "@/components/DailyGame";
 import { problems } from "@/data/problems";
 import { getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems } from "@/lib/daily";
-import { saveStudentName, type StorageLike } from "@/lib/storage";
+import {
+  replaceStudentHistory,
+  saveCachedLeaderboard,
+  saveStudentName,
+  type StorageLike
+} from "@/lib/storage";
+import type { DailyResult } from "@/lib/types";
 
 describe("DailyGame", () => {
   afterEach(() => {
@@ -478,7 +484,7 @@ describe("DailyGame", () => {
 
     expect(screen.getByLabelText("Leaderboard loading")).toBeInTheDocument();
     expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(5);
-    expect(screen.queryByText(/no scores yet this week/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/top spot is yours/i)).not.toBeInTheDocument();
     await waitFor(() => expect(leaderboardRequests).toBe(1));
     resolveNextResponse(pendingLeaderboardResponses);
 
@@ -501,15 +507,62 @@ describe("DailyGame", () => {
 
     await user.click(getButtonByText(/^continue$/i));
 
-    expect(screen.getByLabelText("Leaderboard loading")).toBeInTheDocument();
-    expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(5);
-    expect(screen.queryByText(/no scores yet this week/i)).not.toBeInTheDocument();
+    // The cached leaderboard stays visible while the refresh is in flight,
+    // instead of flashing the loading skeleton.
+    expect(screen.getByText("Riley", { selector: ".leaderboard-name" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Leaderboard loading")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(0);
     await waitFor(() => expect(leaderboardRequests).toBe(2));
     resolveNextResponse(pendingLeaderboardResponses);
 
     expect(await screen.findByText("Ada", { selector: ".leaderboard-name" })).toBeInTheDocument();
     expect(screen.queryByText("Riley", { selector: ".leaderboard-name" })).not.toBeInTheDocument();
     expect(leaderboardRequests).toBe(2);
+  });
+
+  it("keeps the cached leaderboard when the refresh returns empty", async () => {
+    const today = new Date("2026-06-24T18:00:00Z");
+    let leaderboardRequests = 0;
+
+    saveCachedLeaderboard(
+      [
+        { studentName: "Ada", totalPoints: 280, gold: 1, silver: 0, bronze: 0 },
+        { studentName: "Lin", totalPoints: 210, gold: 0, silver: 1, bronze: 0 }
+      ],
+      window.localStorage
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/api/leaderboard")) {
+          leaderboardRequests += 1;
+          // Mirrors an unconfigured/transient backend that returns an empty list.
+          return jsonResponse({ entries: [] });
+        }
+
+        if (url.includes("/api/results")) {
+          return jsonResponse({ results: [] });
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      })
+    );
+
+    render(<DailyGame today={today} />);
+
+    // Cached entries paint immediately — no skeleton.
+    expect(screen.getByText("Ada", { selector: ".leaderboard-name" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Leaderboard loading")).not.toBeInTheDocument();
+
+    // The empty refresh resolves but must not blank out the leaderboard.
+    await waitFor(() => expect(leaderboardRequests).toBe(1));
+
+    expect(await screen.findByText("Ada", { selector: ".leaderboard-name" })).toBeInTheDocument();
+    expect(screen.getByText("Lin", { selector: ".leaderboard-name" })).toBeInTheDocument();
+    expect(screen.queryByText(/top spot is yours/i)).not.toBeInTheDocument();
   });
 
   it("shows a streak placeholder while saved remote history loads", async () => {
@@ -553,6 +606,48 @@ describe("DailyGame", () => {
 
     expect(await screen.findByLabelText("0 day streak")).toBeInTheDocument();
   });
+
+  it("shows the cached streak immediately while saved remote history revalidates", async () => {
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const pendingHistoryResponses: Array<() => void> = [];
+    let historyRequests = 0;
+
+    saveStudentName("Ada", window.localStorage);
+    replaceStudentHistory("Ada", [makeDailyResult(dateKey, "Ada")], window.localStorage);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/api/leaderboard")) {
+          return jsonResponse({ entries: [] });
+        }
+
+        if (url.includes("/api/results")) {
+          historyRequests += 1;
+          return new Promise<Response>((resolve) => {
+            pendingHistoryResponses.push(() => resolve(jsonResponse({ results: [] })));
+          });
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      })
+    );
+
+    render(<DailyGame today={today} />);
+
+    // The cached history yields a 1-day streak right away — no skeleton.
+    expect(await screen.findByLabelText("1 day streak")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Streak loading")).not.toBeInTheDocument();
+
+    await waitFor(() => expect(historyRequests).toBe(1));
+    resolveNextResponse(pendingHistoryResponses);
+
+    // Remote returns no history, so the streak revalidates down to zero.
+    expect(await screen.findByLabelText("0 day streak")).toBeInTheDocument();
+  });
 });
 
 function getButtonByText(text: RegExp): HTMLButtonElement {
@@ -579,6 +674,19 @@ function createMemoryStorage(): StorageLike {
     getItem: (key) => entries.get(key) ?? null,
     setItem: (key, value) => entries.set(key, value),
     removeItem: (key) => entries.delete(key)
+  };
+}
+
+function makeDailyResult(dateKey: string, studentName: string): DailyResult {
+  return {
+    dateKey,
+    studentName,
+    totalScore: 0,
+    maxScore: 390,
+    medal: "practice",
+    completedAt: new Date().toISOString(),
+    questionResults: [],
+    shareText: ""
   };
 }
 
