@@ -20,6 +20,7 @@ export type VocabTerm = {
 
 export type Problem = {
   id: string;
+  scheduledDate: string;
   prompt: string;
   choices: ProblemChoice[];
   correctChoiceId: string;
