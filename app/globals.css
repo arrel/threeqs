@@ -812,22 +812,22 @@ button:disabled {
   background: var(--red);
 }
 
-.vocab-dialog-backdrop {
+.bottom-sheet-backdrop {
   position: absolute;
   inset: 0;
   z-index: 6;
   display: flex;
   align-items: flex-end;
   background: rgba(var(--ink-rgb), 0.34);
-  animation: vocab-scrim-fade-in 320ms ease-out both;
+  animation: bottom-sheet-scrim-fade-in 320ms ease-out both;
 }
 
-.vocab-dialog-backdrop.closing {
+.bottom-sheet-backdrop.closing {
   pointer-events: none;
-  animation: vocab-scrim-fade-out 290ms ease-in both;
+  animation: bottom-sheet-scrim-fade-out 290ms ease-in both;
 }
 
-.vocab-sheet {
+.bottom-sheet {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -840,14 +840,14 @@ button:disabled {
   touch-action: pan-y;
   transform: translateY(0);
   will-change: transform;
-  animation: vocab-sheet-slide-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: bottom-sheet-slide-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.vocab-sheet.closing {
-  animation: vocab-sheet-slide-down 290ms cubic-bezier(0.4, 0, 1, 1) both;
+.bottom-sheet.closing {
+  animation: bottom-sheet-slide-down 290ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
-.vocab-sheet-grabber {
+.bottom-sheet-grabber {
   width: 48px;
   height: 5px;
   flex: 0 0 auto;
@@ -856,7 +856,7 @@ button:disabled {
   background: #dccbb3;
 }
 
-.vocab-sheet-header {
+.bottom-sheet-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -865,7 +865,7 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 
-.vocab-sheet h2 {
+.bottom-sheet-title {
   margin: 0;
   color: var(--ink);
   font-size: clamp(1.65rem, 6vw, 2.3rem);
@@ -873,7 +873,7 @@ button:disabled {
   line-height: 1;
 }
 
-.vocab-close-btn {
+.bottom-sheet-close-btn {
   display: grid;
   width: 44px;
   height: 44px;
@@ -887,8 +887,27 @@ button:disabled {
   padding: 0;
 }
 
-.vocab-close-btn:hover {
+.bottom-sheet-close-btn:hover {
   background: #f6e8cd;
+}
+
+.idle-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: clamp(22px, 6vw, 36px) clamp(18px, 5vw, 32px) clamp(26px, 6vw, 34px);
+}
+
+.idle-prompt-copy {
+  margin: 0;
+  color: #4b4740;
+  font-size: 1.08rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.idle-prompt .primary-action {
+  align-self: stretch;
 }
 
 .vocab-term-list {
@@ -927,7 +946,7 @@ button:disabled {
   line-height: 1.42;
 }
 
-@keyframes vocab-scrim-fade-in {
+@keyframes bottom-sheet-scrim-fade-in {
   from {
     background: rgba(var(--ink-rgb), 0);
   }
@@ -937,7 +956,7 @@ button:disabled {
   }
 }
 
-@keyframes vocab-scrim-fade-out {
+@keyframes bottom-sheet-scrim-fade-out {
   from {
     background: rgba(var(--ink-rgb), 0.34);
   }
@@ -947,7 +966,7 @@ button:disabled {
   }
 }
 
-@keyframes vocab-sheet-slide-up {
+@keyframes bottom-sheet-slide-up {
   from {
     transform: translateY(100%);
   }
@@ -957,7 +976,7 @@ button:disabled {
   }
 }
 
-@keyframes vocab-sheet-slide-down {
+@keyframes bottom-sheet-slide-down {
   from {
     transform: translateY(0);
   }

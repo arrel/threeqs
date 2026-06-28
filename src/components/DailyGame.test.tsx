@@ -189,6 +189,26 @@ describe("DailyGame", () => {
     });
   });
 
+  it("raises the idle prompt after inactivity and resumes on dismiss", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+
+    render(<DailyGame idlePromptAfterMs={250} storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
+
+    // No interaction for the idle window: the prompt covers the question.
+    const idleDialog = await screen.findByRole("dialog", { name: /are you still here/i });
+    expect(within(idleDialog).getByText(/timer is paused/i)).toBeInTheDocument();
+
+    // Dismissing it begins closing the sheet, which resumes the question clock.
+    await user.click(getButtonByText(/i.m still here/i));
+    expect(screen.getByTestId("idle-sheet")).toHaveClass("closing");
+  });
+
   it("shows the explanation and two red answers after two misses", async () => {
     const user = userEvent.setup();
     const storage = createMemoryStorage();
@@ -236,6 +256,51 @@ describe("DailyGame", () => {
     expect(screen.getByTestId(`choice-${problem.correctChoiceId}`)).toHaveClass("correct");
     expect(getButtonByText(/^next$/i)).toBeInTheDocument();
     expect(screen.queryByText(/^check$/i)).not.toBeInTheDocument();
+  });
+
+  it("pauses the question clock while away from the screen and resumes on return", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const dailyProblems = selectDailyProblems(problems, dateKey);
+
+    // Drive the stopwatch with a controllable clock so we can prove that the
+    // time spent away from the question is not counted.
+    let clock = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
+
+    // Spend 5 active seconds on the first question, then leave for home.
+    clock = 6_000;
+    await user.click(screen.getByLabelText("Back"));
+    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
+
+    // 100 seconds pass while the question is off screen — these must not count.
+    clock = 106_000;
+    await user.click(getButtonByText(/^play$/i));
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
+
+    // 3 more active seconds, then answer. Recorded time should be ~8s, not ~108s.
+    clock = 109_000;
+    await user.click(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`));
+    await user.click(getButtonByText(/^check$/i));
+    await user.click(getButtonByText(/^next$/i));
+
+    for (const problem of dailyProblems.slice(1)) {
+      await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
+      await user.click(getButtonByText(/^check$/i));
+      await user.click(getButtonByText(/^next$/i));
+    }
+
+    expect(screen.getByText(/challenge complete/i)).toBeInTheDocument();
+    const questionTimes = document.querySelectorAll(".question-time");
+    expect(questionTimes[0]).toHaveTextContent("8s");
   });
 
   it("redirects protected routes home when no student is saved", async () => {
@@ -598,7 +663,7 @@ function getButtonByText(text: RegExp): HTMLButtonElement {
 function finishVocabDismissal() {
   const event = new Event("animationend", { bubbles: true });
   Object.defineProperty(event, "animationName", {
-    value: "vocab-sheet-slide-down"
+    value: "bottom-sheet-slide-down"
   });
   fireEvent(screen.getByTestId("vocab-sheet"), event);
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy } from "lucide-react";
 import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AnimationEvent as ReactAnimationEvent, PointerEvent as ReactPointerEvent } from "react";
+import { BottomSheet } from "@/components/BottomSheet";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
@@ -42,13 +42,22 @@ type DailyGameProps = {
   route?: GameRoute;
   today?: Date;
   storage?: StorageLike;
+  // Overridable so tests don't have to wait the real three minutes.
+  idlePromptAfterMs?: number;
 };
 
 type GameMode = "home" | "quiz" | "review" | "score" | "streak";
 
-const VOCAB_SHEET_EXIT_MS = 290;
+// Pop the "Are you still here?" prompt after three solid minutes of inactivity.
+const IDLE_PROMPT_AFTER_MS = 3 * 60 * 1000;
 
-export function DailyGame({ onRouteChange, route, today, storage }: DailyGameProps) {
+export function DailyGame({
+  onRouteChange,
+  route,
+  today,
+  storage,
+  idlePromptAfterMs = IDLE_PROMPT_AFTER_MS
+}: DailyGameProps) {
   const dateKey = useMemo(() => getPacificDateKey(today), [today]);
   const dailyProblems = useMemo(() => selectDailyProblems(problems, dateKey), [dateKey]);
   const activeStorage = storage;
@@ -62,8 +71,9 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   const [homeHistory, setHomeHistory] = useState<DailyResult[]>([]);
   const [currentResult, setCurrentResult] = useState<DailyResult | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [questionStart, setQuestionStart] = useState(() => performance.now());
-  const [timerPausedAt, setTimerPausedAt] = useState<number | null>(null);
+  const [questionTimer, setQuestionTimer] = useState<QuestionTimer>(() => pausedTimer(0));
+  const questionTimerRef = useRef(questionTimer);
+  const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [attemptedChoiceIds, setAttemptedChoiceIds] = useState<string[]>([]);
   const [checkedResult, setCheckedResult] = useState<QuestionResult | null>(null);
@@ -76,7 +86,6 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(shouldUseRemoteResults);
   const [isHomeHistoryLoading, setIsHomeHistoryLoading] = useState(shouldUseRemoteResults);
   const [isEditingName, setIsEditingName] = useState(false);
-  const timerPausedAtRef = useRef<number | null>(null);
   const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
@@ -90,6 +99,19 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     },
     [onRouteChange]
   );
+
+  // Keep a ref alongside the timer state so effect cleanups and event handlers
+  // can read the live timer (the state closure would be stale).
+  const updateTimer = useCallback((next: QuestionTimer) => {
+    questionTimerRef.current = next;
+    setQuestionTimer(next);
+  }, []);
+
+  // An overlay (vocab help or the idle prompt) covering the question pauses the
+  // clock; dismissing it resumes from the same elapsed time.
+  const handleTimerPauseChange = useCallback((isPaused: boolean) => {
+    setIsTimerPaused(isPaused);
+  }, []);
 
   useEffect(() => {
     setHasLoadedProfile(false);
@@ -268,10 +290,51 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     isCurrentQuestionFinalized,
     mode,
     questionResults,
-    questionStart,
+    questionTimer,
     selectedChoiceId,
     studentName
   ]);
+
+  // The clock runs while the active (still-unanswered) question is on screen and
+  // nothing is covering it. Leaving the screen — navigating away, unmounting,
+  // hiding the tab, or opening an overlay (vocab help / idle prompt) — pauses
+  // it; returning resumes from the same elapsed time.
+  useEffect(() => {
+    const isOnActiveQuestion =
+      mode === "quiz" && !getQuestionResultAt(questionResults, currentIndex);
+
+    if (!isOnActiveQuestion || isTimerPaused) {
+      return undefined;
+    }
+
+    if (typeof document === "undefined" || document.visibilityState !== "hidden") {
+      updateTimer(resumeTimer(questionTimerRef.current));
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // Persist eagerly: the tab may be frozen before React flushes the
+        // draft-save effect. No navigation has happened, so closures are fresh.
+        const paused = pauseTimer(questionTimerRef.current);
+        updateTimer(paused);
+        saveDraftSnapshot({ questionElapsedMs: Math.round(paused.elapsedMs) });
+      } else {
+        updateTimer(resumeTimer(questionTimerRef.current));
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      // Freeze the timer on the way out. The draft-save effect re-persists the
+      // paused elapsed with the post-navigation state, so we don't write here.
+      updateTimer(pauseTimer(questionTimerRef.current));
+    };
+    // saveDraftSnapshot is intentionally omitted from deps: it is recreated
+    // every render and always reads the latest values via closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, isTimerPaused, mode, questionResults, updateTimer]);
 
   function forceHome() {
     setCurrentIndex(0);
@@ -290,7 +353,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
-    setQuestionStart(performance.now());
+    updateTimer(pausedTimer(0));
 
     if (targetRoute.screen === "question") {
       setCurrentIndex(targetRoute.questionIndex);
@@ -336,7 +399,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
-    setQuestionStart(performance.now());
+    updateTimer(pausedTimer(0));
     setMode("score");
   }
 
@@ -359,7 +422,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
       setAttemptedChoiceIds([]);
       setCheckedResult(null);
       setIsCurrentQuestionFinalized(false);
-      setQuestionStart(performance.now());
+      updateTimer(pausedTimer(0));
       setMode("quiz");
       return;
     }
@@ -387,11 +450,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     setIsCurrentQuestionFinalized(
       shouldRestoreActiveQuestion ? draft.isCurrentQuestionFinalized : false
     );
-    setQuestionStart(
-      shouldRestoreActiveQuestion
-        ? getRestoredQuestionStart(draft.questionStartedAtMs)
-        : performance.now()
-    );
+    updateTimer(pausedTimer(shouldRestoreActiveQuestion ? draft.questionElapsedMs : 0));
     setMode("quiz");
   }
 
@@ -410,7 +469,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
         attemptedChoiceIds,
         checkedResult,
         isCurrentQuestionFinalized,
-        questionStartedAtMs: getQuestionStartedAtMs(questionStart),
+        questionElapsedMs: Math.round(getTimerElapsedMs(questionTimerRef.current)),
         ...overrides
       },
       activeStorage
@@ -493,14 +552,12 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }
 
   function startQuestion() {
-    const start = performance.now();
-    timerPausedAtRef.current = null;
-    setTimerPausedAt(null);
+    setIsTimerPaused(false);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
-    setQuestionStart(start);
+    updateTimer(pausedTimer(0));
   }
 
   function handleCheck() {
@@ -508,10 +565,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
       return;
     }
 
-    const answeredAt = performance.now();
-    const activePauseMilliseconds =
-      timerPausedAtRef.current === null ? 0 : Math.max(0, answeredAt - timerPausedAtRef.current);
-    const exactElapsedSeconds = Math.max(0, (answeredAt - questionStart - activePauseMilliseconds) / 1000);
+    const exactElapsedSeconds = getTimerElapsedMs(questionTimerRef.current) / 1000;
     const nextSelectedChoiceIds = [...attemptedChoiceIds, selectedChoiceId];
     const solved = selectedChoiceId === currentProblem.correctChoiceId;
     const nextResult = scoreQuestion({
@@ -566,6 +620,15 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
 
     if (currentIndex < dailyProblems.length - 1) {
       const nextIndex = currentIndex + 1;
+      // Advancing past the question we just answered starts a fresh clock;
+      // stepping forward through already-answered questions keeps the running
+      // question's elapsed time so it resumes where it paused.
+      const isStartingNewQuestion = !storedResult && !getQuestionResultAt(nextQuestionResults, nextIndex);
+
+      if (isStartingNewQuestion) {
+        updateTimer(pausedTimer(0));
+      }
+
       saveDraftSnapshot({
         currentIndex: nextIndex,
         questionResults: nextQuestionResults,
@@ -573,7 +636,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
         attemptedChoiceIds: [],
         checkedResult: null,
         isCurrentQuestionFinalized: false,
-        questionStartedAtMs: Date.now()
+        ...(isStartingNewQuestion ? { questionElapsedMs: 0 } : {})
       });
       moveToQuestion(nextIndex, nextQuestionResults);
       navigateTo({ screen: "question", questionIndex: nextIndex });
@@ -659,18 +722,16 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     navigateTo({ screen: "question", questionIndex: previousIndex });
   }
 
-  function moveToQuestion(index: number, results: QuestionResult[]) {
-    timerPausedAtRef.current = null;
-    setTimerPausedAt(null);
+  function moveToQuestion(index: number, _results: QuestionResult[]) {
+    // The timer effect resumes (or, for a freshly started question, runs from
+    // zero) once the new index lands on screen, so navigation only resets the
+    // per-question answer state here.
+    setIsTimerPaused(false);
     setCurrentIndex(index);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
-
-    if (!getQuestionResultAt(results, index)) {
-      setQuestionStart(performance.now());
-    }
   }
 
   async function handleScoreContinue() {
@@ -707,8 +768,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }
 
   function handleStreakContinue() {
-    timerPausedAtRef.current = null;
-    setTimerPausedAt(null);
+    setIsTimerPaused(false);
     setCurrentResult(null);
     setQuestionResults([]);
     setSelectedChoiceId(null);
@@ -721,30 +781,6 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   function showHome() {
     setMode("home");
     navigateTo({ screen: "home" });
-  }
-
-  function handleTimerPauseChange(isPaused: boolean) {
-    if (isPaused) {
-      if (timerPausedAtRef.current !== null) {
-        return;
-      }
-
-      const pausedAt = performance.now();
-      timerPausedAtRef.current = pausedAt;
-      setTimerPausedAt(pausedAt);
-      return;
-    }
-
-    const pausedAt = timerPausedAtRef.current;
-
-    if (pausedAt === null) {
-      return;
-    }
-
-    const pausedMilliseconds = Math.max(0, performance.now() - pausedAt);
-    timerPausedAtRef.current = null;
-    setTimerPausedAt(null);
-    setQuestionStart((start) => start + pausedMilliseconds);
   }
 
   return (
@@ -773,6 +809,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
           currentIndex={currentIndex}
           isCurrentQuestionFinalized={isCurrentQuestionFinalized}
           isReview={mode === "review"}
+          idlePromptAfterMs={idlePromptAfterMs}
           onBack={mode === "review" ? handleBackReviewQuestion : handleBackQuestion}
           onCheck={handleCheck}
           onExplain={handleExplainQuestion}
@@ -781,12 +818,11 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
           onTimerPauseChange={handleTimerPauseChange}
           onTryAgain={handleTryAgain}
           problem={currentProblem}
-          questionStart={questionStart}
+          questionTimer={questionTimer}
           result={checkedResult}
           reviewResult={mode === "review" ? currentResult?.questionResults[currentIndex] ?? null : null}
           savedResult={mode === "quiz" ? getQuestionResultAt(questionResults, currentIndex) : null}
           selectedChoiceId={selectedChoiceId}
-          timerPausedAt={timerPausedAt}
           totalQuestions={dailyProblems.length}
         />
       ) : null}
@@ -961,6 +997,7 @@ function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLo
 type QuestionScreenProps = {
   attemptedChoiceIds: string[];
   currentIndex: number;
+  idlePromptAfterMs: number;
   isCurrentQuestionFinalized: boolean;
   isReview: boolean;
   onBack(): void;
@@ -971,18 +1008,18 @@ type QuestionScreenProps = {
   onTimerPauseChange(isPaused: boolean): void;
   onTryAgain(): void;
   problem: Problem;
-  questionStart: number;
+  questionTimer: QuestionTimer;
   result: QuestionResult | null;
   reviewResult: QuestionResult | null;
   savedResult: QuestionResult | null;
   selectedChoiceId: string | null;
-  timerPausedAt: number | null;
   totalQuestions: number;
 };
 
 function QuestionScreen({
   attemptedChoiceIds,
   currentIndex,
+  idlePromptAfterMs,
   isCurrentQuestionFinalized,
   isReview,
   onBack,
@@ -993,16 +1030,15 @@ function QuestionScreen({
   onTimerPauseChange,
   onTryAgain,
   problem,
-  questionStart,
+  questionTimer,
   result,
   reviewResult,
   savedResult,
   selectedChoiceId,
-  timerPausedAt,
   totalQuestions
 }: QuestionScreenProps) {
   const [isVocabOpen, setIsVocabOpen] = useState(false);
-  const [isVocabClosing, setIsVocabClosing] = useState(false);
+  const [isIdleOpen, setIsIdleOpen] = useState(false);
   const [selectedVocabTerm, setSelectedVocabTerm] = useState<VocabTerm | null>(null);
   const displayResult = isReview ? reviewResult : savedResult ?? result;
   const displayAttemptedChoiceIds = isReview
@@ -1030,20 +1066,44 @@ function QuestionScreen({
     [problem.id, problem.choices]
   );
 
+  // Reset any open overlay when moving to a different question.
   useEffect(() => {
     setIsVocabOpen(false);
-    setIsVocabClosing(false);
+    setIsIdleOpen(false);
     setSelectedVocabTerm(null);
   }, [problem.id]);
 
+  // Pause the clock whenever an overlay (vocab help or the idle prompt) covers
+  // the question, and resume the moment it is dismissed.
+  const isOverlayOpen = isVocabOpen || isIdleOpen;
   useEffect(() => {
-    if (!isVocabClosing) {
+    onTimerPauseChange(isOverlayOpen);
+  }, [isOverlayOpen, onTimerPauseChange]);
+
+  // After three solid minutes without any interaction on an unanswered
+  // question, raise the "Are you still here?" prompt over the question.
+  const isAwaitingAnswer = !isReview && !displayResult;
+  useEffect(() => {
+    if (!isAwaitingAnswer || isOverlayOpen) {
       return undefined;
     }
 
-    const timeout = window.setTimeout(handleVocabSheetExited, VOCAB_SHEET_EXIT_MS);
-    return () => window.clearTimeout(timeout);
-  }, [isVocabClosing]);
+    let timeoutId = window.setTimeout(() => setIsIdleOpen(true), idlePromptAfterMs);
+    const restart = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => setIsIdleOpen(true), idlePromptAfterMs);
+    };
+
+    const activityEvents = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"] as const;
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, restart, { passive: true })
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, restart));
+    };
+  }, [idlePromptAfterMs, isAwaitingAnswer, isOverlayOpen]);
 
   function openVocabSheet(term: VocabTerm | null = null) {
     if (vocabTerms.length === 0) {
@@ -1051,32 +1111,7 @@ function QuestionScreen({
     }
 
     setSelectedVocabTerm(term ?? vocabTerms[0]);
-
-    if (isVocabClosing) {
-      onTimerPauseChange(true);
-      setIsVocabClosing(false);
-      return;
-    }
-
-    if (!isVocabOpen) {
-      onTimerPauseChange(true);
-      setIsVocabOpen(true);
-    }
-  }
-
-  function closeVocabSheet() {
-    if (!isVocabOpen || isVocabClosing) {
-      return;
-    }
-
-    onTimerPauseChange(false);
-    setIsVocabClosing(true);
-  }
-
-  function handleVocabSheetExited() {
-    setIsVocabOpen(false);
-    setIsVocabClosing(false);
-    setSelectedVocabTerm(null);
+    setIsVocabOpen(true);
   }
 
   return (
@@ -1114,10 +1149,9 @@ function QuestionScreen({
           ) : null}
 
           <TimerPill
-            key={`${currentIndex}-${questionStart}`}
+            key={currentIndex}
             frozenSeconds={displayResult?.elapsedSeconds}
-            pausedAt={timerPausedAt}
-            startedAt={questionStart}
+            timer={questionTimer}
           />
         </div>
       </header>
@@ -1197,50 +1231,81 @@ function QuestionScreen({
         />
       ) : null}
 
-      {isVocabOpen && vocabTerms.length > 0 ? (
-        <VocabSheet
-          isClosing={isVocabClosing}
-          onClose={closeVocabSheet}
-          onExited={handleVocabSheetExited}
-          selectedTerm={selectedVocabTerm}
-          terms={vocabTerms}
-        />
-      ) : null}
+      <BottomSheet
+        backdropTestId="vocab-backdrop"
+        closeLabel="Close vocabulary help"
+        onDismiss={() => setIsVocabOpen(false)}
+        open={isVocabOpen && vocabTerms.length > 0}
+        testId="vocab-sheet"
+        title="Words to Know"
+        titleId="vocab-sheet-title"
+      >
+        <div className="vocab-term-list">
+          {vocabTerms.map((term) => (
+            <article
+              className={["vocab-term-card", selectedVocabTerm?.term === term.term ? "selected" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              key={term.term}
+            >
+              <h3>{term.term}</h3>
+              <p>{term.definition}</p>
+            </article>
+          ))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        backdropTestId="idle-backdrop"
+        closeLabel="Dismiss reminder"
+        onDismiss={() => setIsIdleOpen(false)}
+        open={isIdleOpen}
+        testId="idle-sheet"
+        title="Are you still here?"
+        titleId="idle-sheet-title"
+      >
+        <div className="idle-prompt">
+          <p className="idle-prompt-copy">
+            Your timer is paused. Tap below when you&rsquo;re ready to keep going.
+          </p>
+          <button
+            className="primary-action"
+            onClick={() => setIsIdleOpen(false)}
+            type="button"
+          >
+            I&rsquo;m still here
+          </button>
+        </div>
+      </BottomSheet>
     </section>
   );
 }
 
 const TimerPill = memo(function TimerPill({
   frozenSeconds,
-  pausedAt,
-  startedAt
+  timer
 }: {
   frozenSeconds?: number;
-  pausedAt: number | null;
-  startedAt: number;
+  timer: QuestionTimer;
 }) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(() => getElapsedSeconds(startedAt));
-  const displaySeconds = toWholeSeconds(frozenSeconds ?? elapsedSeconds);
+  const [liveElapsedMs, setLiveElapsedMs] = useState(() => getTimerElapsedMs(timer));
+  const isRunning = frozenSeconds === undefined && timer.runningSince !== null;
+  const displaySeconds = toWholeSeconds(
+    frozenSeconds !== undefined ? frozenSeconds : liveElapsedMs / 1000
+  );
   const timerText = formatElapsedSeconds(displaySeconds);
   const digitClass = getTimerDigitClass(displaySeconds);
 
   useEffect(() => {
-    if (frozenSeconds !== undefined) {
-      setElapsedSeconds(frozenSeconds);
+    setLiveElapsedMs(getTimerElapsedMs(timer));
+
+    if (!isRunning) {
       return undefined;
     }
 
-    if (pausedAt !== null) {
-      setElapsedSeconds(getElapsedSeconds(startedAt, pausedAt));
-      return undefined;
-    }
-
-    const updateElapsed = () => setElapsedSeconds(getElapsedSeconds(startedAt));
-    updateElapsed();
-
-    const interval = window.setInterval(updateElapsed, 200);
+    const interval = window.setInterval(() => setLiveElapsedMs(getTimerElapsedMs(timer)), 200);
     return () => window.clearInterval(interval);
-  }, [frozenSeconds, pausedAt, startedAt]);
+  }, [isRunning, timer]);
 
   return (
     <div className={`timer-pill ${digitClass}`} aria-label={`${displaySeconds} seconds elapsed`}>
@@ -1249,10 +1314,6 @@ const TimerPill = memo(function TimerPill({
     </div>
   );
 });
-
-function getElapsedSeconds(startedAt: number, currentTime = performance.now()): number {
-  return Math.max(0, (currentTime - startedAt) / 1000);
-}
 
 function toWholeSeconds(seconds: number): number {
   return Math.max(0, Math.floor(seconds));
@@ -1268,128 +1329,6 @@ function getTimerDigitClass(seconds: number): "digits-1" | "digits-2" | "minutes
   }
 
   return "digits-1";
-}
-
-type VocabSheetProps = {
-  isClosing: boolean;
-  onClose(): void;
-  onExited(): void;
-  selectedTerm: VocabTerm | null;
-  terms: VocabTerm[];
-};
-
-function VocabSheet({ isClosing, onClose, onExited, selectedTerm, terms }: VocabSheetProps) {
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const swipeStartYRef = useRef<number | null>(null);
-  const swipeLatestYRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    closeButtonRef.current?.focus({ preventScroll: true });
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  function handleBackdropPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  }
-
-  function handleSheetPointerDown(event: ReactPointerEvent<HTMLElement>) {
-    if (event.pointerType !== "touch") {
-      return;
-    }
-
-    swipeStartYRef.current = event.clientY;
-    swipeLatestYRef.current = event.clientY;
-  }
-
-  function handleSheetPointerMove(event: ReactPointerEvent<HTMLElement>) {
-    if (swipeStartYRef.current === null) {
-      return;
-    }
-
-    swipeLatestYRef.current = event.clientY;
-  }
-
-  function handleSheetPointerUp(event: ReactPointerEvent<HTMLElement>) {
-    const swipeStartY = swipeStartYRef.current;
-    const swipeLatestY = swipeLatestYRef.current;
-
-    swipeStartYRef.current = null;
-    swipeLatestYRef.current = null;
-
-    if (swipeStartY === null || swipeLatestY === null) {
-      return;
-    }
-
-    if (swipeLatestY - swipeStartY > 76) {
-      onClose();
-    }
-  }
-
-  function handleSheetAnimationEnd(event: ReactAnimationEvent<HTMLElement>) {
-    if (isClosing && event.animationName === "vocab-sheet-slide-down") {
-      onExited();
-    }
-  }
-
-  return (
-    <div
-      className={["vocab-dialog-backdrop", isClosing ? "closing" : ""].filter(Boolean).join(" ")}
-      data-testid="vocab-backdrop"
-      onPointerDown={handleBackdropPointerDown}
-    >
-      <section
-        aria-labelledby="vocab-sheet-title"
-        aria-modal="true"
-        className={["vocab-sheet", isClosing ? "closing" : ""].filter(Boolean).join(" ")}
-        data-testid="vocab-sheet"
-        onAnimationEnd={handleSheetAnimationEnd}
-        onPointerDown={handleSheetPointerDown}
-        onPointerMove={handleSheetPointerMove}
-        onPointerUp={handleSheetPointerUp}
-        role="dialog"
-      >
-        <div className="vocab-sheet-grabber" aria-hidden="true" />
-        <header className="vocab-sheet-header">
-          <div>
-            <h2 id="vocab-sheet-title">Words to Know</h2>
-          </div>
-          <button
-            aria-label="Close vocabulary help"
-            className="vocab-close-btn"
-            onClick={onClose}
-            ref={closeButtonRef}
-            type="button"
-          >
-            <X size={22} />
-          </button>
-        </header>
-
-        <div className="vocab-term-list">
-          {terms.map((term) => (
-            <article
-              className={["vocab-term-card", selectedTerm?.term === term.term ? "selected" : ""]
-                .filter(Boolean)
-                .join(" ")}
-              key={term.term}
-            >
-              <h3>{term.term}</h3>
-              <p>{term.definition}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
 }
 
 type FeedbackSheetProps = {
@@ -1553,12 +1492,37 @@ function clampQuestionIndex(index: number, totalQuestions: number): number {
   return Math.min(Math.max(0, Math.floor(index)), totalQuestions - 1);
 }
 
-function getQuestionStartedAtMs(questionStart: number): number {
-  return Date.now() - Math.max(0, performance.now() - questionStart);
+// A pause-aware stopwatch for the active question. `elapsedMs` is the time
+// banked from prior running segments; `runningSince` is the performance.now()
+// mark of the current segment, or null while paused.
+type QuestionTimer = {
+  elapsedMs: number;
+  runningSince: number | null;
+};
+
+function pausedTimer(elapsedMs = 0): QuestionTimer {
+  return { elapsedMs: Math.max(0, elapsedMs), runningSince: null };
 }
 
-function getRestoredQuestionStart(questionStartedAtMs: number): number {
-  return performance.now() - Math.max(0, Date.now() - questionStartedAtMs);
+function getTimerElapsedMs(timer: QuestionTimer): number {
+  const runningMs = timer.runningSince === null ? 0 : Math.max(0, performance.now() - timer.runningSince);
+  return Math.max(0, timer.elapsedMs) + runningMs;
+}
+
+function resumeTimer(timer: QuestionTimer): QuestionTimer {
+  if (timer.runningSince !== null) {
+    return timer;
+  }
+
+  return { elapsedMs: Math.max(0, timer.elapsedMs), runningSince: performance.now() };
+}
+
+function pauseTimer(timer: QuestionTimer): QuestionTimer {
+  if (timer.runningSince === null) {
+    return timer;
+  }
+
+  return { elapsedMs: getTimerElapsedMs(timer), runningSince: null };
 }
 
 function upsertQuestionResult(
