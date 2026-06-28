@@ -21,11 +21,13 @@ import {
 import {
   calculateCurrentStreak,
   clearDailyDraft,
+  getCachedLeaderboard,
   getDailyDraft,
   getSavedStudentName,
   getStudentHistory,
   normalizeStudentName,
   replaceStudentHistory,
+  saveCachedLeaderboard,
   saveDailyDraft,
   saveDailyResult,
   saveStudentName,
@@ -130,7 +132,9 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     }
 
     let isCanceled = false;
-    setIsHomeHistoryLoading(true);
+    // Show the cached streak while we revalidate; only fall back to the
+    // skeleton when there's nothing stored locally to display yet.
+    setIsHomeHistoryLoading(localHistory.length === 0);
 
     loadRemoteHistoryWithLocalFallback(trimmedInput, activeStorage)
       .then((remoteHistory) => {
@@ -160,13 +164,32 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     }
 
     let isCanceled = false;
-    setIsLeaderboardLoading(true);
+    // Show the cached leaderboard while we refresh; only fall back to the
+    // skeleton when there's nothing cached to display yet.
+    const cachedLeaderboard = getCachedLeaderboard(activeStorage);
+    const hasCachedEntries = Boolean(cachedLeaderboard && cachedLeaderboard.length > 0);
+    if (cachedLeaderboard && cachedLeaderboard.length > 0) {
+      setLeaderboard(cachedLeaderboard);
+    }
+    setIsLeaderboardLoading(!hasCachedEntries);
 
     fetchLeaderboard()
       .then((entries) => {
-        if (!isCanceled) {
-          setLeaderboard(entries);
+        if (isCanceled) {
+          return;
         }
+
+        // A populated leaderboard shouldn't be wiped out by an empty refresh
+        // (e.g. a transient failure or an unconfigured backend that returns
+        // an empty list). Keep showing the last good data until we get real
+        // entries back, and never cache an empty result over a good one.
+        if (entries.length === 0) {
+          setLeaderboard((current) => (current.length > 0 ? current : entries));
+          return;
+        }
+
+        setLeaderboard(entries);
+        saveCachedLeaderboard(entries, activeStorage);
       })
       .catch(() => {})
       .then(() => {
@@ -178,7 +201,7 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
     return () => {
       isCanceled = true;
     };
-  }, [mode, shouldUseRemoteResults]);
+  }, [activeStorage, mode, shouldUseRemoteResults]);
 
   useEffect(() => {
     if (!isRoutingEnabled || !route || !hasLoadedProfile) {
@@ -696,10 +719,6 @@ export function DailyGame({ onRouteChange, route, today, storage }: DailyGamePro
   }
 
   function showHome() {
-    if (shouldUseRemoteResults) {
-      setIsLeaderboardLoading(true);
-    }
-
     setMode("home");
     navigateTo({ screen: "home" });
   }
@@ -917,7 +936,7 @@ function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLo
             ))}
           </div>
         ) : display.length === 0 ? (
-          <p className="leaderboard-empty">No scores yet this week</p>
+          <p className="leaderboard-empty">Top spot is yours for the taking</p>
         ) : (
           <ol className="leaderboard-list">
             {display.map((entry, index) => (
