@@ -47,6 +47,8 @@ type DailyGameProps = {
 };
 
 type GameMode = "home" | "quiz" | "review" | "score" | "streak";
+type TransitionDirection = "forward" | "back";
+type HeaderKind = "home" | "question" | "score" | "streak";
 
 // Pop the "Are you still here?" prompt after three solid minutes of inactivity.
 const IDLE_PROMPT_AFTER_MS = 3 * 60 * 1000;
@@ -87,11 +89,26 @@ export function DailyGame({
   const [isHomeHistoryLoading, setIsHomeHistoryLoading] = useState(shouldUseRemoteResults);
   const [isEditingName, setIsEditingName] = useState(false);
   const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
+  const [transitionDirection, setTransitionDirection] = useState<TransitionDirection>("forward");
+  const [isTransitionReady, setIsTransitionReady] = useState(false);
+  const [isVocabOpen, setIsVocabOpen] = useState(false);
+  const [isIdleOpen, setIsIdleOpen] = useState(false);
+  const [selectedVocabTerm, setSelectedVocabTerm] = useState<VocabTerm | null>(null);
+  const routeRankRef = useRef<number | null>(
+    route ? getRouteTransitionRank(route, dailyProblems.length) : null
+  );
 
   const trimmedInput = normalizeStudentName(nameInput);
   const homeStreak = calculateCurrentStreak(homeHistory, dateKey);
   const streak = calculateCurrentStreak(history, dateKey);
   const currentProblem = dailyProblems[currentIndex];
+  const isQuestionMode = mode === "quiz" || mode === "review";
+  const reviewResult = mode === "review" ? currentResult?.questionResults[currentIndex] ?? null : null;
+  const savedResult = mode === "quiz" ? getQuestionResultAt(questionResults, currentIndex) : null;
+  const displayResult = mode === "review" ? reviewResult : savedResult ?? checkedResult;
+  const vocabTerms = isQuestionMode ? currentProblem.vocabTerms ?? [] : [];
+  const headerKind = getHeaderKind(mode);
+  const screenKey = getScreenKey(mode, currentIndex);
 
   const navigateTo = useCallback(
     (nextRoute: GameRoute, navigation: RouteNavigation = "push") => {
@@ -111,6 +128,22 @@ export function DailyGame({
   // clock; dismissing it resumes from the same elapsed time.
   const handleTimerPauseChange = useCallback((isPaused: boolean) => {
     setIsTimerPaused(isPaused);
+  }, []);
+
+  const openVocabSheet = useCallback(
+    (term: VocabTerm | null = null) => {
+      if (vocabTerms.length === 0) {
+        return;
+      }
+
+      setSelectedVocabTerm(term ?? vocabTerms[0]);
+      setIsVocabOpen(true);
+    },
+    [vocabTerms]
+  );
+
+  useEffect(() => {
+    setIsTransitionReady(true);
   }, []);
 
   useEffect(() => {
@@ -230,6 +263,12 @@ export function DailyGame({
       return;
     }
 
+    const nextRouteRank = getRouteTransitionRank(route, dailyProblems.length);
+    if (routeRankRef.current !== null && nextRouteRank !== routeRankRef.current) {
+      setTransitionDirection(nextRouteRank > routeRankRef.current ? "forward" : "back");
+    }
+    routeRankRef.current = nextRouteRank;
+
     if (route.screen === "home") {
       setMode("home");
       return;
@@ -273,7 +312,47 @@ export function DailyGame({
     }
 
     restoreQuestionRoute(draft, route.questionIndex);
-  }, [activeStorage, dateKey, hasLoadedProfile, isRoutingEnabled, navigateTo, route]);
+  }, [activeStorage, dailyProblems.length, dateKey, hasLoadedProfile, isRoutingEnabled, navigateTo, route]);
+
+  // Reset any question overlay when moving to a different question or leaving
+  // the question screen.
+  useEffect(() => {
+    setIsVocabOpen(false);
+    setIsIdleOpen(false);
+    setSelectedVocabTerm(null);
+  }, [currentProblem.id, isQuestionMode]);
+
+  // Pause the clock whenever an overlay (vocab help or the idle prompt) covers
+  // the question, and resume the moment it is dismissed.
+  const isOverlayOpen = isVocabOpen || isIdleOpen;
+  useEffect(() => {
+    handleTimerPauseChange(isQuestionMode && isOverlayOpen);
+  }, [handleTimerPauseChange, isOverlayOpen, isQuestionMode]);
+
+  // After three solid minutes without any interaction on an unanswered
+  // question, raise the "Are you still here?" prompt over the question.
+  const isAwaitingAnswer = isQuestionMode && mode !== "review" && !displayResult;
+  useEffect(() => {
+    if (!isAwaitingAnswer || isOverlayOpen) {
+      return undefined;
+    }
+
+    let timeoutId = window.setTimeout(() => setIsIdleOpen(true), idlePromptAfterMs);
+    const restart = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => setIsIdleOpen(true), idlePromptAfterMs);
+    };
+
+    const activityEvents = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"] as const;
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, restart, { passive: true })
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, restart));
+    };
+  }, [idlePromptAfterMs, isAwaitingAnswer, isOverlayOpen]);
 
   useEffect(() => {
     if (mode !== "quiz" || !studentName) {
@@ -337,6 +416,7 @@ export function DailyGame({
   }, [currentIndex, isTimerPaused, mode, questionResults, updateTimer]);
 
   function forceHome() {
+    setTransitionDirection("back");
     setCurrentIndex(0);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
@@ -497,6 +577,7 @@ export function DailyGame({
       setHomeHistory(nextHistory);
 
       if (existingResult) {
+        setTransitionDirection("forward");
         setCurrentResult(existingResult);
         setQuestionResults(existingResult.questionResults);
         setCurrentIndex(0);
@@ -514,6 +595,7 @@ export function DailyGame({
 
         if (firstIncompleteQuestionIndex >= dailyProblems.length) {
           restoreDraftResultsRoute(trimmedInput, draft);
+          setTransitionDirection("forward");
           navigateTo({ screen: "results" });
           return;
         }
@@ -523,6 +605,7 @@ export function DailyGame({
           firstIncompleteQuestionIndex
         );
         restoreQuestionRoute(draft, questionIndex);
+        setTransitionDirection("forward");
         navigateTo({ screen: "question", questionIndex });
         return;
       }
@@ -535,6 +618,7 @@ export function DailyGame({
           currentIndex > 0)
       ) {
         setCurrentResult(null);
+        setTransitionDirection("forward");
         setMode("quiz");
         navigateTo({ screen: "question", questionIndex: currentIndex });
         return;
@@ -544,6 +628,7 @@ export function DailyGame({
       setQuestionResults([]);
       setCurrentIndex(0);
       startQuestion();
+      setTransitionDirection("forward");
       setMode("quiz");
       navigateTo({ screen: "question", questionIndex: 0 });
     } finally {
@@ -638,6 +723,7 @@ export function DailyGame({
         isCurrentQuestionFinalized: false,
         ...(isStartingNewQuestion ? { questionElapsedMs: 0 } : {})
       });
+      setTransitionDirection("forward");
       moveToQuestion(nextIndex, nextQuestionResults);
       navigateTo({ screen: "question", questionIndex: nextIndex });
       return;
@@ -663,6 +749,7 @@ export function DailyGame({
       isCurrentQuestionFinalized: false
     });
     setCurrentResult(nextResult);
+    setTransitionDirection("forward");
     setMode("score");
     navigateTo({ screen: "results" });
   }
@@ -681,6 +768,7 @@ export function DailyGame({
     if (currentIndex === 0) {
       saveDraftSnapshot({ questionResults: nextQuestionResults });
       setCurrentIndex(0);
+      setTransitionDirection("back");
       showHome();
       return;
     }
@@ -694,6 +782,7 @@ export function DailyGame({
       checkedResult: null,
       isCurrentQuestionFinalized: false
     });
+    setTransitionDirection("back");
     moveToQuestion(previousIndex, nextQuestionResults);
     navigateTo({ screen: "question", questionIndex: previousIndex });
   }
@@ -701,11 +790,13 @@ export function DailyGame({
   function handleNextReviewQuestion() {
     if (currentIndex < dailyProblems.length - 1) {
       const nextIndex = currentIndex + 1;
+      setTransitionDirection("forward");
       setCurrentIndex(nextIndex);
       navigateTo({ screen: "question", questionIndex: nextIndex });
       return;
     }
 
+    setTransitionDirection("forward");
     setMode("score");
     navigateTo({ screen: "results" });
   }
@@ -713,11 +804,13 @@ export function DailyGame({
   function handleBackReviewQuestion() {
     if (currentIndex === 0) {
       setCurrentIndex(0);
+      setTransitionDirection("back");
       showHome();
       return;
     }
 
     const previousIndex = currentIndex - 1;
+    setTransitionDirection("back");
     setCurrentIndex(previousIndex);
     navigateTo({ screen: "question", questionIndex: previousIndex });
   }
@@ -760,6 +853,7 @@ export function DailyGame({
       clearDailyDraft(savedResult.studentName, dateKey, activeStorage);
       setHistory(nextHistory);
       setHomeHistory(nextHistory);
+      setTransitionDirection("forward");
       setMode("streak");
       navigateTo({ screen: "streak" });
     } finally {
@@ -775,6 +869,7 @@ export function DailyGame({
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
+    setTransitionDirection("back");
     showHome();
   }
 
@@ -785,63 +880,170 @@ export function DailyGame({
 
   return (
     <main className="app-shell">
-      {mode === "home" ? (
-        <HomeScreen
-          dateKey={dateKey}
-          isEditingName={isEditingName}
-          isHomeHistoryLoading={isHomeHistoryLoading}
-          isLeaderboardLoading={isLeaderboardLoading}
-          isProfileLoading={isProfileLoading}
-          isStarting={isStarting}
-          leaderboard={leaderboard}
-          nameInput={nameInput}
-          onEditName={() => setIsEditingName(true)}
-          onNameChange={setNameInput}
-          onSubmit={handleStart}
-          savedName={studentName}
-          streak={homeStreak}
-        />
-      ) : null}
+      <section className={`app-card game-card ${mode}-frame`} aria-label={getFrameLabel(mode)}>
+        <div className="game-header-shell">
+          <div
+            className={[
+              "game-header",
+              `game-header-${headerKind}`,
+              isTransitionReady ? "transition-ready" : ""
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            key={headerKind}
+          >
+            {mode === "home" ? (
+              <HomeHeader
+                dateKey={dateKey}
+                isHomeHistoryLoading={isHomeHistoryLoading}
+                streak={homeStreak}
+              />
+            ) : null}
 
-      {mode === "quiz" || mode === "review" ? (
-        <QuestionScreen
-          attemptedChoiceIds={attemptedChoiceIds}
-          currentIndex={currentIndex}
-          isCurrentQuestionFinalized={isCurrentQuestionFinalized}
-          isReview={mode === "review"}
-          idlePromptAfterMs={idlePromptAfterMs}
-          onBack={mode === "review" ? handleBackReviewQuestion : handleBackQuestion}
-          onCheck={handleCheck}
-          onExplain={handleExplainQuestion}
-          onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
-          onSelectChoice={setSelectedChoiceId}
-          onTimerPauseChange={handleTimerPauseChange}
-          onTryAgain={handleTryAgain}
-          problem={currentProblem}
-          questionTimer={questionTimer}
-          result={checkedResult}
-          reviewResult={mode === "review" ? currentResult?.questionResults[currentIndex] ?? null : null}
-          savedResult={mode === "quiz" ? getQuestionResultAt(questionResults, currentIndex) : null}
-          selectedChoiceId={selectedChoiceId}
-          totalQuestions={dailyProblems.length}
-        />
-      ) : null}
+            {isQuestionMode ? (
+              <QuestionHeader
+                currentIndex={currentIndex}
+                displayResult={displayResult}
+                onBack={mode === "review" ? handleBackReviewQuestion : handleBackQuestion}
+                onOpenVocabSheet={openVocabSheet}
+                questionTimer={questionTimer}
+                totalQuestions={dailyProblems.length}
+                vocabTerms={vocabTerms}
+              />
+            ) : null}
 
-      {mode === "score" && currentResult ? (
-        <ScoreScreen isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
-      ) : null}
+            {mode === "score" && currentResult ? <ScoreHeader result={currentResult} /> : null}
 
-      {mode === "streak" ? (
-        <StreakScreen onContinue={handleStreakContinue} streak={streak} />
-      ) : null}
+            {mode === "streak" ? <StreakHeader streak={streak} /> : null}
+          </div>
+        </div>
+
+        <div className="screen-viewport">
+          <div
+            className={[
+              "screen-panel",
+              isTransitionReady ? "transition-ready" : "",
+              `slide-${transitionDirection}`
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            key={screenKey}
+          >
+            {mode === "home" ? (
+              <HomeScreen
+                isEditingName={isEditingName}
+                isLeaderboardLoading={isLeaderboardLoading}
+                isProfileLoading={isProfileLoading}
+                isStarting={isStarting}
+                leaderboard={leaderboard}
+                nameInput={nameInput}
+                onEditName={() => setIsEditingName(true)}
+                onNameChange={setNameInput}
+                onSubmit={handleStart}
+                savedName={studentName}
+              />
+            ) : null}
+
+            {isQuestionMode ? (
+              <QuestionScreen
+                attemptedChoiceIds={attemptedChoiceIds}
+                isCurrentQuestionFinalized={isCurrentQuestionFinalized}
+                isReview={mode === "review"}
+                onCheck={handleCheck}
+                onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
+                onOpenVocabSheet={openVocabSheet}
+                onSelectChoice={setSelectedChoiceId}
+                problem={currentProblem}
+                result={checkedResult}
+                reviewResult={reviewResult}
+                savedResult={savedResult}
+                selectedChoiceId={selectedChoiceId}
+              />
+            ) : null}
+
+            {mode === "score" && currentResult ? (
+              <ScoreScreen isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
+            ) : null}
+
+            {mode === "streak" ? (
+              <StreakScreen onContinue={handleStreakContinue} streak={streak} />
+            ) : null}
+          </div>
+        </div>
+
+        {isQuestionMode && !savedResult && checkedResult ? (
+          <FeedbackSheet
+            canTryAgain={Boolean(
+              mode !== "review" &&
+                !savedResult &&
+                checkedResult &&
+                !checkedResult.solved &&
+                !isCurrentQuestionFinalized &&
+                checkedResult.attemptsUsed < MAX_ATTEMPTS
+            )}
+            isFinalQuestion={currentIndex + 1 === dailyProblems.length}
+            isFinalized={isCurrentQuestionFinalized}
+            onExplain={handleExplainQuestion}
+            onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
+            onTryAgain={handleTryAgain}
+            problem={currentProblem}
+            result={checkedResult}
+          />
+        ) : null}
+
+        <BottomSheet
+          backdropTestId="vocab-backdrop"
+          closeLabel="Close vocabulary help"
+          onDismiss={() => setIsVocabOpen(false)}
+          open={isQuestionMode && isVocabOpen && vocabTerms.length > 0}
+          testId="vocab-sheet"
+          title="Words to Know"
+          titleId="vocab-sheet-title"
+        >
+          <div className="vocab-term-list">
+            {vocabTerms.map((term) => (
+              <article
+                className={["vocab-term-card", selectedVocabTerm?.term === term.term ? "selected" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+                key={term.term}
+              >
+                <h3>{term.term}</h3>
+                <p>{term.definition}</p>
+              </article>
+            ))}
+          </div>
+        </BottomSheet>
+
+        <BottomSheet
+          backdropTestId="idle-backdrop"
+          closeLabel="Dismiss reminder"
+          onDismiss={() => setIsIdleOpen(false)}
+          open={isQuestionMode && isIdleOpen}
+          testId="idle-sheet"
+          title="Are you still here?"
+          titleId="idle-sheet-title"
+        >
+          <div className="idle-prompt">
+            <p className="idle-prompt-copy">
+              Your timer is paused. Tap below when you&rsquo;re ready to keep going.
+            </p>
+            <button
+              className="primary-action"
+              onClick={() => setIsIdleOpen(false)}
+              type="button"
+            >
+              I&rsquo;m still here
+            </button>
+          </div>
+        </BottomSheet>
+      </section>
     </main>
   );
 }
 
 type HomeScreenProps = {
-  dateKey: string;
   isEditingName: boolean;
-  isHomeHistoryLoading: boolean;
   isLeaderboardLoading: boolean;
   isProfileLoading: boolean;
   isStarting: boolean;
@@ -851,13 +1053,10 @@ type HomeScreenProps = {
   onNameChange(name: string): void;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   savedName: string;
-  streak: number;
 };
 
 function HomeScreen({
-  dateKey,
   isEditingName,
-  isHomeHistoryLoading,
   isLeaderboardLoading,
   isProfileLoading,
   isStarting,
@@ -866,39 +1065,13 @@ function HomeScreen({
   onEditName,
   onNameChange,
   onSubmit,
-  savedName,
-  streak
+  savedName
 }: HomeScreenProps) {
   const showNameInput = !savedName || isEditingName;
   const nameLabelId = "student-name-label";
 
   return (
-    <section className="app-card home-card" aria-label="Three Qs home">
-      <div className="home-topbar">
-        <p className="today-label home-date">{formatDateKey(dateKey)}</p>
-        <div
-          aria-busy={isHomeHistoryLoading}
-          aria-label={isHomeHistoryLoading ? "Streak loading" : `${streak} day streak`}
-          className="streak-pill"
-        >
-          <span className="streak-icon">
-            <Flame size={18} />
-          </span>
-          <span className="streak-value">
-            {isHomeHistoryLoading ? (
-              <span aria-hidden="true" className="streak-skeleton" />
-            ) : (
-              <>
-                <strong>{streak}</strong>
-                <small>{streak === 1 ? "day" : "days"}</small>
-              </>
-            )}
-          </span>
-        </div>
-      </div>
-
-      <div aria-hidden="true" />
-
+    <section className="home-card" aria-label="Three Qs home">
       <div className="home-copy">
         <h1 className="home-wordmark">
           Three<span className="home-wordmark-qs">Qs</span>
@@ -959,6 +1132,41 @@ function HomeScreen({
   );
 }
 
+function HomeHeader({
+  dateKey,
+  isHomeHistoryLoading,
+  streak
+}: {
+  dateKey: string;
+  isHomeHistoryLoading: boolean;
+  streak: number;
+}) {
+  return (
+    <div className="home-topbar">
+      <p className="today-label home-date">{formatDateKey(dateKey)}</p>
+      <div
+        aria-busy={isHomeHistoryLoading}
+        aria-label={isHomeHistoryLoading ? "Streak loading" : `${streak} day streak`}
+        className="streak-pill"
+      >
+        <span className="streak-icon">
+          <Flame size={18} />
+        </span>
+        <span className="streak-value">
+          {isHomeHistoryLoading ? (
+            <span aria-hidden="true" className="streak-skeleton" />
+          ) : (
+            <>
+              <strong>{streak}</strong>
+              <small>{streak === 1 ? "day" : "days"}</small>
+            </>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLoading: boolean }) {
   const display = entries;
   return (
@@ -996,50 +1204,33 @@ function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLo
 
 type QuestionScreenProps = {
   attemptedChoiceIds: string[];
-  currentIndex: number;
-  idlePromptAfterMs: number;
   isCurrentQuestionFinalized: boolean;
   isReview: boolean;
-  onBack(): void;
   onCheck(): void;
-  onExplain(): void;
   onNext(): void;
+  onOpenVocabSheet(term?: VocabTerm | null): void;
   onSelectChoice(choiceId: string): void;
-  onTimerPauseChange(isPaused: boolean): void;
-  onTryAgain(): void;
   problem: Problem;
-  questionTimer: QuestionTimer;
   result: QuestionResult | null;
   reviewResult: QuestionResult | null;
   savedResult: QuestionResult | null;
   selectedChoiceId: string | null;
-  totalQuestions: number;
 };
 
 function QuestionScreen({
   attemptedChoiceIds,
-  currentIndex,
-  idlePromptAfterMs,
   isCurrentQuestionFinalized,
   isReview,
-  onBack,
   onCheck,
-  onExplain,
   onNext,
+  onOpenVocabSheet,
   onSelectChoice,
-  onTimerPauseChange,
-  onTryAgain,
   problem,
-  questionTimer,
   result,
   reviewResult,
   savedResult,
-  selectedChoiceId,
-  totalQuestions
+  selectedChoiceId
 }: QuestionScreenProps) {
-  const [isVocabOpen, setIsVocabOpen] = useState(false);
-  const [isIdleOpen, setIsIdleOpen] = useState(false);
-  const [selectedVocabTerm, setSelectedVocabTerm] = useState<VocabTerm | null>(null);
   const displayResult = isReview ? reviewResult : savedResult ?? result;
   const displayAttemptedChoiceIds = isReview
     ? reviewResult?.selectedChoiceIds ?? []
@@ -1049,14 +1240,6 @@ function QuestionScreen({
     : savedResult?.selectedChoiceIds.at(-1) ?? selectedChoiceId;
   const isViewingSavedAnswer = Boolean(isReview || savedResult);
   const displayIsFinalized = Boolean(isViewingSavedAnswer || isCurrentQuestionFinalized);
-  const canTryAgain = Boolean(
-    !isReview &&
-      !savedResult &&
-      displayResult &&
-      !displayResult.solved &&
-      !isCurrentQuestionFinalized &&
-      displayResult.attemptsUsed < MAX_ATTEMPTS
-  );
   const vocabTerms = problem.vocabTerms ?? [];
 
   // Shuffle choices deterministically per problem so the order is randomized
@@ -1066,99 +1249,11 @@ function QuestionScreen({
     [problem.id, problem.choices]
   );
 
-  // Reset any open overlay when moving to a different question.
-  useEffect(() => {
-    setIsVocabOpen(false);
-    setIsIdleOpen(false);
-    setSelectedVocabTerm(null);
-  }, [problem.id]);
-
-  // Pause the clock whenever an overlay (vocab help or the idle prompt) covers
-  // the question, and resume the moment it is dismissed.
-  const isOverlayOpen = isVocabOpen || isIdleOpen;
-  useEffect(() => {
-    onTimerPauseChange(isOverlayOpen);
-  }, [isOverlayOpen, onTimerPauseChange]);
-
-  // After three solid minutes without any interaction on an unanswered
-  // question, raise the "Are you still here?" prompt over the question.
-  const isAwaitingAnswer = !isReview && !displayResult;
-  useEffect(() => {
-    if (!isAwaitingAnswer || isOverlayOpen) {
-      return undefined;
-    }
-
-    let timeoutId = window.setTimeout(() => setIsIdleOpen(true), idlePromptAfterMs);
-    const restart = () => {
-      window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => setIsIdleOpen(true), idlePromptAfterMs);
-    };
-
-    const activityEvents = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"] as const;
-    activityEvents.forEach((eventName) =>
-      window.addEventListener(eventName, restart, { passive: true })
-    );
-
-    return () => {
-      window.clearTimeout(timeoutId);
-      activityEvents.forEach((eventName) => window.removeEventListener(eventName, restart));
-    };
-  }, [idlePromptAfterMs, isAwaitingAnswer, isOverlayOpen]);
-
-  function openVocabSheet(term: VocabTerm | null = null) {
-    if (vocabTerms.length === 0) {
-      return;
-    }
-
-    setSelectedVocabTerm(term ?? vocabTerms[0]);
-    setIsVocabOpen(true);
-  }
-
   return (
-    <section className="app-card quiz-card" aria-label="Question screen">
-      <header className="quiz-topbar">
-        <button className="quiz-back-btn" aria-label="Back" onClick={onBack} type="button">
-          <ArrowLeft size={23} />
-        </button>
-
-        <div className="segmented-progress" aria-label={`Question ${currentIndex + 1} of ${totalQuestions}`}>
-          {Array.from({ length: totalQuestions }).map((_, index) => (
-            <span
-              className={[
-                "progress-segment",
-                index < currentIndex ? "complete" : "",
-                index === currentIndex ? "current" : ""
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              key={index}
-            />
-          ))}
-        </div>
-
-        <div className="quiz-tools">
-          {vocabTerms.length > 0 ? (
-            <button
-              aria-label="Open vocabulary help"
-              className="vocab-help-btn"
-              onClick={() => openVocabSheet()}
-              type="button"
-            >
-              <HelpCircle size={18} />
-            </button>
-          ) : null}
-
-          <TimerPill
-            key={currentIndex}
-            frozenSeconds={displayResult?.elapsedSeconds}
-            timer={questionTimer}
-          />
-        </div>
-      </header>
-
+    <section className="quiz-card" aria-label="Question screen">
       <div className="quiz-content">
         <div className="quiz-prompt">
-          <MathText onVocabTermSelect={openVocabSheet} text={problem.prompt} vocabTerms={vocabTerms} />
+          <MathText onVocabTermSelect={onOpenVocabSheet} text={problem.prompt} vocabTerms={vocabTerms} />
         </div>
 
         <div className="answer-grid">
@@ -1218,66 +1313,91 @@ function QuestionScreen({
         )}
       </div>
 
-      {!isReview && !savedResult && result ? (
-        <FeedbackSheet
-          canTryAgain={canTryAgain}
-          isFinalQuestion={currentIndex + 1 === totalQuestions}
-          isFinalized={isCurrentQuestionFinalized}
-          onExplain={onExplain}
-          onNext={onNext}
-          onTryAgain={onTryAgain}
-          problem={problem}
-          result={result}
-        />
-      ) : null}
+    </section>
+  );
+}
 
-      <BottomSheet
-        backdropTestId="vocab-backdrop"
-        closeLabel="Close vocabulary help"
-        onDismiss={() => setIsVocabOpen(false)}
-        open={isVocabOpen && vocabTerms.length > 0}
-        testId="vocab-sheet"
-        title="Words to Know"
-        titleId="vocab-sheet-title"
-      >
-        <div className="vocab-term-list">
-          {vocabTerms.map((term) => (
-            <article
-              className={["vocab-term-card", selectedVocabTerm?.term === term.term ? "selected" : ""]
-                .filter(Boolean)
-                .join(" ")}
-              key={term.term}
-            >
-              <h3>{term.term}</h3>
-              <p>{term.definition}</p>
-            </article>
-          ))}
-        </div>
-      </BottomSheet>
+function QuestionHeader({
+  currentIndex,
+  displayResult,
+  onBack,
+  onOpenVocabSheet,
+  questionTimer,
+  totalQuestions,
+  vocabTerms
+}: {
+  currentIndex: number;
+  displayResult: QuestionResult | null;
+  onBack(): void;
+  onOpenVocabSheet(term?: VocabTerm | null): void;
+  questionTimer: QuestionTimer;
+  totalQuestions: number;
+  vocabTerms: VocabTerm[];
+}) {
+  return (
+    <header className="quiz-topbar">
+      <button className="quiz-back-btn" aria-label="Back" onClick={onBack} type="button">
+        <ArrowLeft size={23} />
+      </button>
 
-      <BottomSheet
-        backdropTestId="idle-backdrop"
-        closeLabel="Dismiss reminder"
-        onDismiss={() => setIsIdleOpen(false)}
-        open={isIdleOpen}
-        testId="idle-sheet"
-        title="Are you still here?"
-        titleId="idle-sheet-title"
-      >
-        <div className="idle-prompt">
-          <p className="idle-prompt-copy">
-            Your timer is paused. Tap below when you&rsquo;re ready to keep going.
-          </p>
+      <div className="segmented-progress" aria-label={`Question ${currentIndex + 1} of ${totalQuestions}`}>
+        {Array.from({ length: totalQuestions }).map((_, index) => (
+          <span
+            className={[
+              "progress-segment",
+              index < currentIndex ? "complete" : "",
+              index === currentIndex ? "current" : ""
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            key={index}
+          />
+        ))}
+      </div>
+
+      <div className="quiz-tools">
+        {vocabTerms.length > 0 ? (
           <button
-            className="primary-action"
-            onClick={() => setIsIdleOpen(false)}
+            aria-label="Open vocabulary help"
+            className="vocab-help-btn"
+            onClick={() => onOpenVocabSheet()}
             type="button"
           >
-            I&rsquo;m still here
+            <HelpCircle size={18} />
           </button>
-        </div>
-      </BottomSheet>
-    </section>
+        ) : null}
+
+        <TimerPill
+          key={currentIndex}
+          frozenSeconds={displayResult?.elapsedSeconds}
+          timer={questionTimer}
+        />
+      </div>
+    </header>
+  );
+}
+
+function ScoreHeader({ result }: { result: DailyResult }) {
+  return (
+    <header className="result-topbar">
+      <p className="today-label">Results</p>
+      <span className="result-header-score">
+        {result.totalScore}
+        <small>/{MAX_DAILY_SCORE} pts</small>
+      </span>
+    </header>
+  );
+}
+
+function StreakHeader({ streak }: { streak: number }) {
+  return (
+    <header className="result-topbar">
+      <p className="today-label">Streak</p>
+      <span className="result-header-score">
+        {streak}
+        <small>{streak === 1 ? " day" : " days"}</small>
+      </span>
+    </header>
   );
 }
 
@@ -1400,7 +1520,7 @@ function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
   const medalLabel = getMedalLabel(result.medal);
 
   return (
-    <section className="app-card score-card" aria-label="Completion score">
+    <section className="score-card" aria-label="Completion score">
       <div className="card-body">
         <div className={`medal-emblem ${result.medal}`}>
           {result.medal === "gold" ? <Trophy size={54} /> : <Medal size={54} />}
@@ -1450,7 +1570,7 @@ type StreakScreenProps = {
 
 function StreakScreen({ onContinue, streak }: StreakScreenProps) {
   return (
-    <section className="app-card streak-card" aria-label="Current streak">
+    <section className="streak-card" aria-label="Current streak">
       <div className="card-body">
         <div className="streak-burst" aria-hidden="true">
           <Flame size={86} fill="currentColor" />
@@ -1468,6 +1588,54 @@ function StreakScreen({ onContinue, streak }: StreakScreenProps) {
       </button>
     </section>
   );
+}
+
+function getHeaderKind(mode: GameMode): HeaderKind {
+  if (mode === "quiz" || mode === "review") {
+    return "question";
+  }
+
+  return mode;
+}
+
+function getFrameLabel(mode: GameMode): string {
+  if (mode === "quiz" || mode === "review") {
+    return "Question screen";
+  }
+
+  if (mode === "score") {
+    return "Completion score";
+  }
+
+  if (mode === "streak") {
+    return "Current streak";
+  }
+
+  return "Three Qs home";
+}
+
+function getScreenKey(mode: GameMode, currentIndex: number): string {
+  if (mode === "quiz" || mode === "review") {
+    return `${mode}-${currentIndex}`;
+  }
+
+  return mode;
+}
+
+function getRouteTransitionRank(route: GameRoute, totalQuestions: number): number {
+  if (route.screen === "question") {
+    return route.questionIndex + 1;
+  }
+
+  if (route.screen === "results") {
+    return totalQuestions + 1;
+  }
+
+  if (route.screen === "streak") {
+    return totalQuestions + 2;
+  }
+
+  return 0;
 }
 
 function getQuestionResultAt(results: QuestionResult[], index: number): QuestionResult | null {
