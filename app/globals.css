@@ -521,6 +521,81 @@ button:disabled {
   color: #5f7a5b;
 }
 
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 58px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fffaf0;
+  color: var(--muted);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.secondary-action:hover {
+  background: #f7ecd7;
+  color: var(--ink);
+}
+
+.ready-card {
+  grid-template-rows: auto 1fr auto;
+  padding: 24px clamp(18px, 5vw, 32px);
+}
+
+.ready-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.ready-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.ready-icon {
+  display: grid;
+  width: 104px;
+  height: 104px;
+  place-items: center;
+  border-radius: 28px;
+  background: var(--yellow);
+  color: #8c4b00;
+  box-shadow: 0 22px 42px rgba(245, 173, 39, 0.24);
+}
+
+.ready-copy h1 {
+  max-width: 24rem;
+  margin: 0;
+  font-size: clamp(2.2rem, 9.2vw, 3.7rem);
+  font-weight: 900;
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.ready-copy p {
+  max-width: 25rem;
+  min-height: 4.4em;
+  margin: 0;
+  color: #4b4740;
+  font-size: clamp(1.08rem, 3.1vw, 1.28rem);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.ready-actions {
+  display: grid;
+  gap: 12px;
+}
+
 .quiz-card {
   grid-template-rows: auto 1fr auto;
   padding: 24px clamp(18px, 5vw, 32px);
@@ -1234,6 +1309,10 @@ button:disabled {
   }
 
   .home-card {
+    padding-top: 18px;
+  }
+
+  .ready-card {
     padding-top: 18px;
   }
 

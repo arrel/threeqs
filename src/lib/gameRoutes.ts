@@ -1,5 +1,6 @@
 export type GameRoute =
   | { screen: "home" }
+  | { screen: "ready" }
   | { screen: "question"; questionIndex: number }
   | { screen: "results" }
   | { screen: "streak" }
@@ -12,6 +13,10 @@ export function parseGameRoutePath(pathname: string): GameRoute {
 
   if (normalizedPath === "/") {
     return { screen: "home" };
+  }
+
+  if (normalizedPath === "/ready") {
+    return { screen: "ready" };
   }
 
   const questionMatch = normalizedPath.match(/^\/questions\/([1-3])$/);
@@ -37,6 +42,8 @@ export function getGameRoutePath(route: GameRoute): string {
   switch (route.screen) {
     case "home":
       return "/";
+    case "ready":
+      return "/ready";
     case "question":
       return `/questions/${route.questionIndex + 1}`;
     case "results":
