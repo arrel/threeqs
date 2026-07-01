@@ -35,7 +35,7 @@ import {
   type StorageLike
 } from "@/lib/storage";
 import { formatElapsedSeconds } from "@/lib/time";
-import type { DailyResult, Problem, QuestionResult, VocabTerm } from "@/lib/types";
+import type { DailyResult, Medal as MedalResult, Problem, QuestionResult, VocabTerm } from "@/lib/types";
 
 type DailyGameProps = {
   onRouteChange?(route: GameRoute, navigation?: RouteNavigation): void;
@@ -97,7 +97,6 @@ export function DailyGame({
   const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
-  const homeStreak = calculateCurrentStreak(homeHistory, dateKey);
   const streak = calculateCurrentStreak(history, dateKey);
   const currentProblem = dailyProblems[currentIndex];
 
@@ -843,12 +842,12 @@ export function DailyGame({
           isProfileLoading={isProfileLoading}
           isStarting={isStarting}
           leaderboard={leaderboard}
+          history={homeHistory}
           nameInput={nameInput}
           onEditName={() => setIsEditingName(true)}
           onNameChange={setNameInput}
           onSubmit={handleStart}
           savedName={studentName}
-          streak={homeStreak}
         />
       ) : null}
 
@@ -939,12 +938,12 @@ type HomeScreenProps = {
   isProfileLoading: boolean;
   isStarting: boolean;
   leaderboard: LeaderboardEntry[];
+  history: DailyResult[];
   nameInput: string;
   onEditName(): void;
   onNameChange(name: string): void;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   savedName: string;
-  streak: number;
 };
 
 function HomeScreen({
@@ -955,39 +954,36 @@ function HomeScreen({
   isProfileLoading,
   isStarting,
   leaderboard,
+  history,
   nameInput,
   onEditName,
   onNameChange,
   onSubmit,
-  savedName,
-  streak
+  savedName
 }: HomeScreenProps) {
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const showNameInput = !savedName || isEditingName;
   const nameLabelId = "student-name-label";
+  const leaderboardPosition = getLeaderboardPosition(leaderboard, savedName);
+  const streakDays = buildHomeStreakDays(history, dateKey);
 
   return (
     <section className="app-card home-card" aria-label="Three Qs home">
       <div className="home-topbar">
         <p className="today-label home-date">{formatDateKey(dateKey)}</p>
-        <div
-          aria-busy={isHomeHistoryLoading}
-          aria-label={isHomeHistoryLoading ? "Streak loading" : `${streak} day streak`}
-          className="streak-pill"
+        <button
+          aria-label={
+            leaderboardPosition
+              ? `Open leaderboard, you are #${leaderboardPosition}`
+              : "Open leaderboard"
+          }
+          className="leaderboard-trigger"
+          onClick={() => setIsLeaderboardOpen(true)}
+          type="button"
         >
-          <span className="streak-icon">
-            <Flame size={18} />
-          </span>
-          <span className="streak-value">
-            {isHomeHistoryLoading ? (
-              <span aria-hidden="true" className="streak-skeleton" />
-            ) : (
-              <>
-                <strong>{streak}</strong>
-                <small>{streak === 1 ? "day" : "days"}</small>
-              </>
-            )}
-          </span>
-        </div>
+          <Trophy size={17} />
+          <span>{leaderboardPosition ? `#${leaderboardPosition}` : "Leaderboard"}</span>
+        </button>
       </div>
 
       <div aria-hidden="true" />
@@ -1001,7 +997,15 @@ function HomeScreen({
 
       <div aria-hidden="true" />
 
-      <Leaderboard entries={leaderboard} isLoading={isLeaderboardLoading} />
+      {savedName ? (
+        <HomeStreakStrip
+          days={streakDays.days}
+          hasActiveDay={streakDays.hasActiveDay}
+          isLoading={isHomeHistoryLoading}
+        />
+      ) : (
+        <div className="home-streak-blank" aria-hidden="true" />
+      )}
 
       <div aria-hidden="true" />
 
@@ -1048,14 +1052,39 @@ function HomeScreen({
           Play
         </button>
       </form>
+
+      <BottomSheet
+        backdropTestId="leaderboard-backdrop"
+        closeLabel="Close leaderboard"
+        onDismiss={() => setIsLeaderboardOpen(false)}
+        open={isLeaderboardOpen}
+        testId="leaderboard-sheet"
+        title="Leaderboard"
+        titleId="leaderboard-sheet-title"
+      >
+        <Leaderboard entries={leaderboard} isLoading={isLeaderboardLoading} variant="sheet" />
+      </BottomSheet>
     </section>
   );
 }
 
-function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLoading: boolean }) {
+function Leaderboard({
+  entries,
+  isLoading,
+  variant = "inline"
+}: {
+  entries: LeaderboardEntry[];
+  isLoading: boolean;
+  variant?: "inline" | "sheet";
+}) {
   const display = entries;
   return (
-    <div className="leaderboard" aria-busy={isLoading}>
+    <div
+      className={["leaderboard", variant === "sheet" ? "leaderboard-sheet-content" : ""]
+        .filter(Boolean)
+        .join(" ")}
+      aria-busy={isLoading}
+    >
       <p className="leaderboard-title">Top Players · Last 7 Days</p>
       <div className="leaderboard-body">
         {isLoading ? (
@@ -1073,9 +1102,29 @@ function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLo
                 <span className="leaderboard-rank">{index + 1}</span>
                 <span className="leaderboard-name">{entry.studentName}</span>
                 <span className="leaderboard-medals">
-                  {entry.gold > 0 && <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>{entry.gold}</span>}
-                  {entry.silver > 0 && <span className="lb-medal silver" data-tip={`${entry.silver} silver`} tabIndex={0}>{entry.silver}</span>}
-                  {entry.bronze > 0 && <span className="lb-medal bronze" data-tip={`${entry.bronze} bronze`} tabIndex={0}>{entry.bronze}</span>}
+                  {entry.gold > 0 && (
+                    <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>
+                      {entry.gold}
+                    </span>
+                  )}
+                  {entry.silver > 0 && (
+                    <span
+                      className="lb-medal silver"
+                      data-tip={`${entry.silver} silver`}
+                      tabIndex={0}
+                    >
+                      {entry.silver}
+                    </span>
+                  )}
+                  {entry.bronze > 0 && (
+                    <span
+                      className="lb-medal bronze"
+                      data-tip={`${entry.bronze} bronze`}
+                      tabIndex={0}
+                    >
+                      {entry.bronze}
+                    </span>
+                  )}
                 </span>
                 <span className="leaderboard-pts">{entry.totalPoints}<small>pts</small></span>
               </li>
@@ -1085,6 +1134,133 @@ function Leaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLo
       </div>
     </div>
   );
+}
+
+type HomeStreakDay = {
+  dateKey: string;
+  dayLabel: string;
+  medal: MedalResult | null;
+};
+
+function HomeStreakStrip({
+  days,
+  hasActiveDay,
+  isLoading
+}: {
+  days: HomeStreakDay[];
+  hasActiveDay: boolean;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <section className="home-streak-panel" aria-label="Streak loading" aria-busy="true">
+        <div className="home-streak-heading">
+          <p className="leaderboard-title">Current Streak</p>
+          <span aria-hidden="true" className="home-streak-title-skeleton" />
+        </div>
+        <div className="home-streak-strip" role="status">
+          {Array.from({ length: 7 }).map((_, index) => (
+            <span aria-hidden="true" className="home-streak-skeleton-day" key={index} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="home-streak-panel" aria-label="Recent streak">
+      <div className="home-streak-heading">
+        <p className="leaderboard-title">Current Streak</p>
+        {!hasActiveDay ? (
+          <p className="home-streak-encouragement">Start your streak today.</p>
+        ) : null}
+      </div>
+      <div className="home-streak-strip">
+        {days.map((day) => (
+          <div className="home-streak-day" key={day.dateKey}>
+            <span className="home-streak-day-label">{day.dayLabel}</span>
+            <span
+              aria-label={day.medal ? `${day.dayLabel} ${day.medal}` : `${day.dayLabel} blank`}
+              className={["home-streak-spot", day.medal ?? "blank"].join(" ")}
+              data-testid={`streak-spot-${day.dateKey}`}
+            >
+              {day.medal ? getStreakSpotLabel(day.medal) : ""}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function getLeaderboardPosition(entries: LeaderboardEntry[], savedName: string): number | null {
+  const savedKey = normalizeStudentName(savedName).toLocaleLowerCase();
+  if (!savedKey) {
+    return null;
+  }
+
+  const index = entries.findIndex(
+    (entry) => normalizeStudentName(entry.studentName).toLocaleLowerCase() === savedKey
+  );
+
+  return index >= 0 ? index + 1 : null;
+}
+
+function buildHomeStreakDays(
+  results: DailyResult[],
+  todayKey: string
+): { days: HomeStreakDay[]; hasActiveDay: boolean } {
+  const resultByDate = new Map(results.map((result) => [result.dateKey, result]));
+  const lookbackKeys = Array.from({ length: 7 }, (_, index) =>
+    addDaysToDateKey(todayKey, index - 6)
+  );
+  const oldestActiveKey = lookbackKeys.find((dateKey) => resultByDate.has(dateKey));
+  const startKey = oldestActiveKey ?? lookbackKeys[0];
+
+  return {
+    hasActiveDay: Boolean(oldestActiveKey),
+    days: Array.from({ length: 7 }, (_, index) => {
+      const dateKey = addDaysToDateKey(startKey, index);
+      return {
+        dateKey,
+        dayLabel: formatWeekdayLabel(dateKey),
+        medal: dateKey <= todayKey ? resultByDate.get(dateKey)?.medal ?? null : null
+      };
+    })
+  };
+}
+
+function addDaysToDateKey(dateKey: string, offsetDays: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatWeekdayLabel(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "short"
+  }).format(date);
+}
+
+function getStreakSpotLabel(medal: MedalResult): string {
+  if (medal === "gold") {
+    return "G";
+  }
+
+  if (medal === "silver") {
+    return "S";
+  }
+
+  if (medal === "bronze") {
+    return "B";
+  }
+
+  return "P";
 }
 
 type QuestionScreenProps = {
@@ -1343,7 +1519,9 @@ function QuestionScreen({
               key={term.term}
             >
               <h3>{term.term}</h3>
-              <p>{term.definition}</p>
+              <p>
+                <MathText text={term.definition} />
+              </p>
             </article>
           ))}
         </div>

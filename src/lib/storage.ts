@@ -155,7 +155,7 @@ export function getCachedLeaderboard(storage = getBrowserStorage()): Leaderboard
       return null;
     }
 
-    return parsed.entries;
+    return mergeLeaderboardEntries(parsed.entries);
   } catch {
     return null;
   }
@@ -173,8 +173,39 @@ export function saveCachedLeaderboard(
     LEADERBOARD_KEY,
     JSON.stringify({
       version: 1,
-      entries
+      entries: mergeLeaderboardEntries(entries)
     } satisfies StoredLeaderboard)
+  );
+}
+
+function mergeLeaderboardEntries(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+  const byStudent = new Map<string, LeaderboardEntry>();
+
+  for (const entry of entries) {
+    const studentKey = getStudentKey(entry.studentName);
+    if (!studentKey) {
+      continue;
+    }
+
+    const current =
+      byStudent.get(studentKey) ??
+      ({
+        studentName: normalizeStudentName(entry.studentName),
+        totalPoints: 0,
+        gold: 0,
+        silver: 0,
+        bronze: 0
+      } satisfies LeaderboardEntry);
+
+    current.totalPoints += entry.totalPoints;
+    current.gold += entry.gold;
+    current.silver += entry.silver;
+    current.bronze += entry.bronze;
+    byStudent.set(studentKey, current);
+  }
+
+  return [...byStudent.values()].sort(
+    (a, b) => b.totalPoints - a.totalPoints || b.gold - a.gold || b.silver - a.silver
   );
 }
 
