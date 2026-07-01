@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateCurrentStreak,
+  clearSavedStudentName,
   getCachedLeaderboard,
   getDailyResult,
   getSavedStudentName,
@@ -8,12 +9,10 @@ import {
   normalizeStudentName,
   replaceStudentHistory,
   saveCachedLeaderboard,
-  saveDailyDraft,
   saveDailyResult,
   saveStudentName,
   type StorageLike
 } from "@/lib/storage";
-import { isDisallowedStudentName } from "@/lib/studentNamePolicy";
 import type { DailyResult } from "@/lib/types";
 
 describe("local result storage", () => {
@@ -21,37 +20,13 @@ describe("local result storage", () => {
     expect(normalizeStudentName("  Ada   Lovelace ")).toBe("Ada Lovelace");
   });
 
-  it("flags high-confidence dirty student names without substring false positives", () => {
-    expect(isDisallowedStudentName("sh!t")).toBe(true);
-    expect(isDisallowedStudentName("Frank the butt")).toBe(true);
-    expect(isDisallowedStudentName("ass frank")).toBe(true);
-    expect(isDisallowedStudentName("Ada Cassie Dickinson")).toBe(false);
-    expect(isDisallowedStudentName("Essex Class")).toBe(false);
-    expect(isDisallowedStudentName("Button Class")).toBe(false);
-  });
-
-  it("silently skips persisting disallowed student names and results", () => {
+  it("clears the saved student profile", () => {
     const storage = createMemoryStorage();
 
-    saveStudentName("sh!t", storage);
-    saveDailyDraft(
-      {
-        dateKey: "2026-06-24",
-        studentName: "sh!t",
-        currentIndex: 0,
-        questionResults: [],
-        selectedChoiceId: null,
-        attemptedChoiceIds: [],
-        checkedResult: null,
-        isCurrentQuestionFinalized: false,
-        questionElapsedMs: 0
-      },
-      storage
-    );
-    saveDailyResult(createResult("sh!t", "2026-06-24", 240), storage);
+    saveStudentName("Ada", storage);
+    clearSavedStudentName("Ada", storage);
 
     expect(getSavedStudentName(storage)).toBe("");
-    expect(getStudentHistory("sh!t", storage)).toEqual([]);
   });
 
   it("saves one result per student per date", () => {

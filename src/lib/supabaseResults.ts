@@ -1,5 +1,5 @@
 import { getStudentKey, normalizeStudentName } from "@/lib/storage";
-import { isDisallowedStudentName } from "@/lib/studentNamePolicy";
+import { isDisallowedStudentName } from "@/lib/server/studentNamePolicy";
 import type { DailyResult, Medal, QuestionResult } from "@/lib/types";
 
 type SupabaseConfig = {

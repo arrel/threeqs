@@ -1,5 +1,4 @@
 import { previousDateKey } from "@/lib/date";
-import { isDisallowedStudentName } from "@/lib/studentNamePolicy";
 import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
 import type { DailyResult, QuestionResult } from "@/lib/types";
 
@@ -127,7 +126,7 @@ export function saveStudentName(name: string, storage = getBrowserStorage()): vo
   }
 
   const studentName = normalizeStudentName(name);
-  if (!studentName || isDisallowedStudentName(studentName)) {
+  if (!studentName) {
     return;
   }
 
@@ -138,6 +137,26 @@ export function saveStudentName(name: string, storage = getBrowserStorage()): vo
       studentName
     } satisfies StoredProfile)
   );
+}
+
+export function clearSavedStudentName(
+  name?: string,
+  storage = getBrowserStorage()
+): void {
+  if (!storage) {
+    return;
+  }
+
+  if (name && getStudentKey(getSavedStudentName(storage)) !== getStudentKey(name)) {
+    return;
+  }
+
+  if (storage.removeItem) {
+    storage.removeItem(PROFILE_KEY);
+    return;
+  }
+
+  storage.setItem(PROFILE_KEY, "");
 }
 
 export function getCachedLeaderboard(storage = getBrowserStorage()): LeaderboardEntry[] | null {
@@ -262,7 +281,7 @@ export function saveDailyDraft(draft: DailyDraft, storage = getBrowserStorage())
   }
 
   const studentName = normalizeStudentName(draft.studentName);
-  if (!studentName || isDisallowedStudentName(studentName) || !draft.dateKey) {
+  if (!studentName || !draft.dateKey) {
     return;
   }
 
@@ -325,7 +344,7 @@ export function getDailyResult(
 
 export function saveDailyResult(result: DailyResult, storage = getBrowserStorage()): void {
   const studentKey = getStudentKey(result.studentName);
-  if (!studentKey || isDisallowedStudentName(result.studentName)) {
+  if (!studentKey) {
     return;
   }
 
@@ -346,7 +365,7 @@ export function replaceStudentHistory(
   storage = getBrowserStorage()
 ): void {
   const studentKey = getStudentKey(name);
-  if (!studentKey || isDisallowedStudentName(name)) {
+  if (!studentKey) {
     return;
   }
 
