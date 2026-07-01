@@ -191,6 +191,39 @@ describe("DailyGame", () => {
     });
   });
 
+  it("renders math inside vocabulary definitions", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-30T18:00:00Z");
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+    await user.click(screen.getByLabelText(/open vocabulary help/i));
+
+    const vocabDialog = screen.getByRole("dialog", { name: /words to know/i });
+
+    expect(within(vocabDialog).getByText(/^Coordinate Plane$/i)).toBeInTheDocument();
+    expect(vocabDialog.querySelectorAll(".vocab-term-card .katex")).toHaveLength(2);
+    expect(within(vocabDialog).queryByText(/A grid with an \$x\$-axis/)).not.toBeInTheDocument();
+  });
+
+  it("shows literal dollar signs for money amounts while keeping nearby math rendered", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-29T18:00:00Z");
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+
+    expect(document.body).toHaveTextContent("$12.50");
+    expect(screen.getByText("$20.00")).toBeInTheDocument();
+    expect(document.querySelectorAll(".quiz-prompt .katex").length).toBeGreaterThan(0);
+  });
+
   it("raises the idle prompt after inactivity and resumes on dismiss", async () => {
     const user = userEvent.setup();
     const storage = createMemoryStorage();

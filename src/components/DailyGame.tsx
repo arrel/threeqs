@@ -1250,7 +1250,9 @@ function QuestionScreen({
               key={term.term}
             >
               <h3>{term.term}</h3>
-              <p>{term.definition}</p>
+              <p>
+                <MathText text={term.definition} />
+              </p>
             </article>
           ))}
         </div>
