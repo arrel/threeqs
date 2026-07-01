@@ -58,30 +58,78 @@ type Token =
 
 function splitMathText(text: string): Token[] {
   const tokens: Token[] = [];
-  const pattern = /(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g;
   let cursor = 0;
-  let match: RegExpExecArray | null;
+  let textStart = 0;
 
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > cursor) {
-      tokens.push({ kind: "text", value: text.slice(cursor, match.index) });
+  while (cursor < text.length) {
+    if (text[cursor] !== "$" || isEscaped(text, cursor)) {
+      cursor += 1;
+      continue;
     }
 
-    const raw = match[0];
-    const display = raw.startsWith("$$");
+    const display = text.startsWith("$$", cursor);
+    const delimiter = display ? "$$" : "$";
+    const mathStart = cursor + delimiter.length;
+    const mathEnd = findClosingMathDelimiter(text, mathStart, delimiter);
+
+    if (mathEnd === null) {
+      cursor += delimiter.length;
+      continue;
+    }
+
+    if (textStart < cursor) {
+      tokens.push({ kind: "text", value: unescapeText(text.slice(textStart, cursor)) });
+    }
+
     tokens.push({
       kind: "math",
-      value: display ? raw.slice(2, -2) : raw.slice(1, -1),
+      value: text.slice(mathStart, mathEnd),
       display
     });
-    cursor = match.index + raw.length;
+
+    cursor = mathEnd + delimiter.length;
+    textStart = cursor;
   }
 
-  if (cursor < text.length) {
-    tokens.push({ kind: "text", value: text.slice(cursor) });
+  if (textStart < text.length) {
+    tokens.push({ kind: "text", value: unescapeText(text.slice(textStart)) });
   }
 
   return tokens;
+}
+
+function findClosingMathDelimiter(text: string, start: number, delimiter: "$" | "$$"): number | null {
+  let cursor = start;
+
+  while (cursor < text.length) {
+    if (delimiter === "$" && text[cursor] === "\n") {
+      return null;
+    }
+
+    if (text.startsWith(delimiter, cursor) && !isEscaped(text, cursor)) {
+      return cursor;
+    }
+
+    cursor += 1;
+  }
+
+  return null;
+}
+
+function isEscaped(text: string, index: number): boolean {
+  let backslashCount = 0;
+  let cursor = index - 1;
+
+  while (cursor >= 0 && text[cursor] === "\\") {
+    backslashCount += 1;
+    cursor -= 1;
+  }
+
+  return backslashCount % 2 === 1;
+}
+
+function unescapeText(text: string): string {
+  return text.replace(/\\\$/g, "$");
 }
 
 type VocabTextPart =

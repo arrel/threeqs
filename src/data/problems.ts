@@ -94,15 +94,15 @@ export const problems: Problem[] = [
   {
     id: "easy-apples-unit-rate",
     scheduledDate: "2026-06-29",
-    prompt: "If $5$ pounds of apples cost $12.50$, what is the cost of $8$ pounds of apples?",
+    prompt: "If $5$ pounds of apples cost \\$12.50, what is the cost of $8$ pounds of apples?",
     choices: [
-      { id: "A", label: "$15.00" },
-      { id: "B", label: "$18.00" },
-      { id: "C", label: "$20.00" },
-      { id: "D", label: "$22.50" }
+      { id: "A", label: "\\$15.00" },
+      { id: "B", label: "\\$18.00" },
+      { id: "C", label: "\\$20.00" },
+      { id: "D", label: "\\$22.50" }
     ],
     correctChoiceId: "C",
-    explanation: "First find the price for $1$ pound: $12.50 \\div 5 = 2.50$. Then multiply by $8$: $8 \\cdot 2.50 = 20.00$.",
+    explanation: "First find the price for $1$ pound: $\\$12.50 \\div 5 = \\$2.50$. Then multiply by $8$: $8 \\cdot \\$2.50 = \\$20.00$.",
     difficulty: "easy",
     topics: ["proportional reasoning", "unit rate"],
     vocabTerms: [
@@ -142,15 +142,15 @@ export const problems: Problem[] = [
   {
     id: "stretch-jacket-discounts",
     scheduledDate: "2026-06-29",
-    prompt: "A jacket costs $150$ before a sale. It is $20\\%$ off, and then a coupon takes another $10\\%$ off the sale price. What is the final price before tax?",
+    prompt: "A jacket costs \\$150 before a sale. It is $20\\%$ off, and then a coupon takes another $10\\%$ off the sale price. What is the final price before tax?",
     choices: [
-      { id: "A", label: "$105" },
-      { id: "B", label: "$108" },
-      { id: "C", label: "$110" },
-      { id: "D", label: "$120" }
+      { id: "A", label: "\\$105" },
+      { id: "B", label: "\\$108" },
+      { id: "C", label: "\\$110" },
+      { id: "D", label: "\\$120" }
     ],
     correctChoiceId: "B",
-    explanation: "The first discount leaves $80\\%$ of the price: $150 \\cdot 0.80 = 120$. The coupon takes $10\\%$ off that sale price, so $120 \\cdot 0.90 = 108$.",
+    explanation: "The first discount leaves $80\\%$ of the price: $\\$150 \\cdot 0.80 = \\$120$. The coupon takes $10\\%$ off that sale price, so $\\$120 \\cdot 0.90 = \\$108$.",
     difficulty: "stretch",
     topics: ["proportional reasoning", "percent"],
     vocabTerms: [
