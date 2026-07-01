@@ -23,8 +23,11 @@ describe("local result storage", () => {
 
   it("flags high-confidence dirty student names without substring false positives", () => {
     expect(isDisallowedStudentName("sh!t")).toBe(true);
+    expect(isDisallowedStudentName("Frank the butt")).toBe(true);
+    expect(isDisallowedStudentName("ass frank")).toBe(true);
     expect(isDisallowedStudentName("Ada Cassie Dickinson")).toBe(false);
     expect(isDisallowedStudentName("Essex Class")).toBe(false);
+    expect(isDisallowedStudentName("Button Class")).toBe(false);
   });
 
   it("silently skips persisting disallowed student names and results", () => {

@@ -1,8 +1,12 @@
 const DISALLOWED_STUDENT_NAME_TOKENS = new Set([
+  "ass",
+  "asses",
   "bastard",
   "bitch",
   "boob",
   "boobs",
+  "butt",
+  "butts",
   "cunt",
   "douche",
   "fuck",
