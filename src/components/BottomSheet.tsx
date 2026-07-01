@@ -9,6 +9,7 @@ import type {
 } from "react";
 
 // Keep in sync with the .bottom-sheet.closing animation duration in globals.css.
+const SHEET_ENTER_MS = 320;
 const SHEET_EXIT_MS = 290;
 const SWIPE_DISMISS_THRESHOLD = 76;
 const CLOSE_ANIMATION_NAME = "bottom-sheet-slide-down";
@@ -19,6 +20,7 @@ type BottomSheetProps = {
   titleId: string;
   testId: string;
   backdropTestId: string;
+  className?: string;
   closeLabel: string;
   onDismiss(): void;
   onClosed?(): void;
@@ -37,6 +39,7 @@ export function BottomSheet({
   titleId,
   testId,
   backdropTestId,
+  className,
   closeLabel,
   onDismiss,
   onClosed,
@@ -72,7 +75,9 @@ export function BottomSheet({
       return undefined;
     }
 
-    closeButtonRef.current?.focus({ preventScroll: true });
+    const focusTimeout = window.setTimeout(() => {
+      closeButtonRef.current?.focus({ preventScroll: true });
+    }, SHEET_ENTER_MS);
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -81,7 +86,10 @@ export function BottomSheet({
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.clearTimeout(focusTimeout);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isMounted, onDismiss]);
 
   function finishClose() {
@@ -148,7 +156,9 @@ export function BottomSheet({
       <section
         aria-labelledby={titleId}
         aria-modal="true"
-        className={["bottom-sheet", isClosing ? "closing" : ""].filter(Boolean).join(" ")}
+        className={["bottom-sheet", className, isClosing ? "closing" : ""]
+          .filter(Boolean)
+          .join(" ")}
         data-testid={testId}
         onAnimationEnd={handleSheetAnimationEnd}
         onPointerDown={handleSheetPointerDown}
