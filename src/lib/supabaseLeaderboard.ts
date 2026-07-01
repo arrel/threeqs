@@ -1,3 +1,4 @@
+import { getStudentKey, normalizeStudentName } from "@/lib/storage";
 import type { Medal } from "@/lib/types";
 
 type DailyResultRow = {
@@ -61,13 +62,18 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
   const byStudent = new Map<string, LeaderboardEntry>();
 
   for (const row of rows) {
-    const name = row.student_name;
-    const entry = byStudent.get(name) ?? { studentName: name, totalPoints: 0, gold: 0, silver: 0, bronze: 0 };
+    const studentKey = getStudentKey(row.student_name);
+    if (!studentKey) {
+      continue;
+    }
+
+    const name = normalizeStudentName(row.student_name);
+    const entry = byStudent.get(studentKey) ?? { studentName: name, totalPoints: 0, gold: 0, silver: 0, bronze: 0 };
     entry.totalPoints += row.total_score;
     if (row.medal === "gold") entry.gold += 1;
     else if (row.medal === "silver") entry.silver += 1;
     else if (row.medal === "bronze") entry.bronze += 1;
-    byStudent.set(name, entry);
+    byStudent.set(studentKey, entry);
   }
 
   return [...byStudent.values()]

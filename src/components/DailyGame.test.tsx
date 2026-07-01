@@ -517,13 +517,17 @@ describe("DailyGame", () => {
 
     render(<DailyGame today={today} />);
 
-    expect(screen.getByLabelText("Leaderboard loading")).toBeInTheDocument();
-    expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(5);
+    expect(screen.getByRole("button", { name: "Open leaderboard" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Leaderboard loading")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(0);
     expect(screen.queryByText(/top spot is yours/i)).not.toBeInTheDocument();
     await waitFor(() => expect(leaderboardRequests).toBe(1));
     resolveNextResponse(pendingLeaderboardResponses);
 
-    expect(await screen.findByText("Riley")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open leaderboard" }));
+    expect(await screen.findByText("Riley", { selector: ".leaderboard-name" })).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Close leaderboard"));
+    finishLeaderboardDismissal();
     expect(leaderboardRequests).toBe(1);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
@@ -544,6 +548,7 @@ describe("DailyGame", () => {
 
     // The cached leaderboard stays visible while the refresh is in flight,
     // instead of flashing the loading skeleton.
+    await user.click(screen.getByRole("button", { name: "Open leaderboard" }));
     expect(screen.getByText("Riley", { selector: ".leaderboard-name" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Leaderboard loading")).not.toBeInTheDocument();
     expect(document.querySelectorAll(".leaderboard-skeleton-bar")).toHaveLength(0);
@@ -566,6 +571,7 @@ describe("DailyGame", () => {
       ],
       window.localStorage
     );
+    saveStudentName("Ada", window.localStorage);
 
     vi.stubGlobal(
       "fetch",
@@ -589,6 +595,10 @@ describe("DailyGame", () => {
     render(<DailyGame today={today} />);
 
     // Cached entries paint immediately — no skeleton.
+    expect(
+      await screen.findByRole("button", { name: "Open leaderboard, you are #1" })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open leaderboard, you are #1" }));
     expect(screen.getByText("Ada", { selector: ".leaderboard-name" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Leaderboard loading")).not.toBeInTheDocument();
 
@@ -634,12 +644,13 @@ describe("DailyGame", () => {
     expect(screen.getByLabelText("Edit name")).toBeInTheDocument();
     expect(screen.queryByLabelText("Name loading")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Streak loading")).toBeInTheDocument();
-    expect(screen.queryByLabelText("0 day streak")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Recent streak")).not.toBeInTheDocument();
 
     await waitFor(() => expect(historyRequests).toBe(1));
     resolveNextResponse(pendingHistoryResponses);
 
-    expect(await screen.findByLabelText("0 day streak")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Recent streak")).toBeInTheDocument();
+    expect(screen.getByText("Start your streak today.")).toBeInTheDocument();
   });
 
   it("shows the cached streak immediately while saved remote history revalidates", async () => {
@@ -673,15 +684,191 @@ describe("DailyGame", () => {
 
     render(<DailyGame today={today} />);
 
-    // The cached history yields a 1-day streak right away — no skeleton.
-    expect(await screen.findByLabelText("1 day streak")).toBeInTheDocument();
+    // The cached history yields a streak strip right away — no skeleton.
+    expect(await screen.findByLabelText("Recent streak")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Wed practice/i)).toBeInTheDocument();
     expect(screen.queryByLabelText("Streak loading")).not.toBeInTheDocument();
 
     await waitFor(() => expect(historyRequests).toBe(1));
     resolveNextResponse(pendingHistoryResponses);
 
-    // Remote returns no history, so the streak revalidates down to zero.
-    expect(await screen.findByLabelText("0 day streak")).toBeInTheDocument();
+    // Remote returns no history, so the strip revalidates to the empty state.
+    expect(await screen.findByText("Start your streak today.")).toBeInTheDocument();
+  });
+
+  it("shows the saved student's top-five leaderboard position in the top right", async () => {
+    const today = new Date("2026-06-24T18:00:00Z");
+
+    saveStudentName("Ada", window.localStorage);
+    saveCachedLeaderboard(
+      [
+        { studentName: "Riley", totalPoints: 390, gold: 1, silver: 0, bronze: 0 },
+        { studentName: "Ada", totalPoints: 280, gold: 0, silver: 1, bronze: 1 }
+      ],
+      window.localStorage
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/api/leaderboard")) {
+          return jsonResponse({
+            entries: [
+              { studentName: "Riley", totalPoints: 390, gold: 1, silver: 0, bronze: 0 },
+              { studentName: "Ada", totalPoints: 280, gold: 0, silver: 1, bronze: 1 }
+            ]
+          });
+        }
+
+        if (url.includes("/api/results")) {
+          return jsonResponse({ results: [] });
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      })
+    );
+
+    render(<DailyGame today={today} />);
+
+    expect(
+      await screen.findByRole("button", { name: "Open leaderboard, you are #2" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("#2")).toBeInTheDocument();
+  });
+
+  it("opens and closes the leaderboard bottom sheet from the home topbar", async () => {
+    const user = userEvent.setup();
+    const today = new Date("2026-06-24T18:00:00Z");
+
+    saveCachedLeaderboard(
+      [{ studentName: "Riley", totalPoints: 390, gold: 1, silver: 0, bronze: 0 }],
+      window.localStorage
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/api/leaderboard")) {
+          return jsonResponse({
+            entries: [{ studentName: "Riley", totalPoints: 390, gold: 1, silver: 0, bronze: 0 }]
+          });
+        }
+
+        if (url.includes("/api/results")) {
+          return jsonResponse({ results: [] });
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      })
+    );
+
+    render(<DailyGame today={today} />);
+
+    await user.click(screen.getByRole("button", { name: "Open leaderboard" }));
+
+    const sheet = await screen.findByTestId("leaderboard-sheet");
+    expect(within(sheet).getByRole("heading", { name: "Leaderboard" })).toBeInTheDocument();
+    expect(within(sheet).getByText("Riley", { selector: ".leaderboard-name" })).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Close leaderboard"));
+    finishLeaderboardDismissal();
+
+    await waitFor(() => expect(screen.queryByTestId("leaderboard-sheet")).not.toBeInTheDocument());
+  });
+
+  it("renders recent streak medals with blank gaps from the oldest active day", () => {
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+
+    saveStudentName("Ada", storage);
+    replaceStudentHistory(
+      "Ada",
+      [
+        makeDailyResult("2026-06-22", "Ada", "bronze"),
+        makeDailyResult("2026-06-24", "Ada", "gold")
+      ],
+      storage
+    );
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    expect(screen.getByLabelText("Recent streak")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mon bronze")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tue blank")).toBeInTheDocument();
+    expect(screen.getByLabelText("Wed gold")).toBeInTheDocument();
+    expect(screen.getByTestId("streak-spot-2026-06-22")).toBeInTheDocument();
+    expect(screen.getByTestId("streak-spot-2026-06-28")).toBeInTheDocument();
+  });
+
+  it("shows seven filled streak spots when the last seven days are complete through today", () => {
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const todayKey = getPacificDateKey(today);
+
+    saveStudentName("Ada", storage);
+    replaceStudentHistory(
+      "Ada",
+      Array.from({ length: 7 }, (_, index) =>
+        makeDailyResult(offsetDateKey(todayKey, index - 6), "Ada", "silver")
+      ),
+      storage
+    );
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    expect(screen.getByLabelText("Recent streak")).toBeInTheDocument();
+    expect(document.querySelectorAll(".home-streak-spot.blank")).toHaveLength(0);
+    expect(document.querySelectorAll(".home-streak-spot.silver")).toHaveLength(7);
+  });
+
+  it("omits the result from seven days ago when today is blank", () => {
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const todayKey = getPacificDateKey(today);
+
+    saveStudentName("Ada", storage);
+    replaceStudentHistory(
+      "Ada",
+      Array.from({ length: 7 }, (_, index) =>
+        makeDailyResult(offsetDateKey(todayKey, index - 7), "Ada", "gold")
+      ),
+      storage
+    );
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    expect(screen.queryByTestId("streak-spot-2026-06-17")).not.toBeInTheDocument();
+    expect(screen.getByTestId("streak-spot-2026-06-24")).toHaveClass("blank");
+    expect(document.querySelectorAll(".home-streak-spot.gold")).toHaveLength(6);
+  });
+
+  it("shows seven empty streak spots and encouragement when there are no recent active days", () => {
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+
+    saveStudentName("Ada", storage);
+    replaceStudentHistory("Ada", [makeDailyResult("2026-06-01", "Ada", "practice")], storage);
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    expect(screen.getByText("Start your streak today.")).toBeInTheDocument();
+    expect(document.querySelectorAll(".home-streak-spot.blank")).toHaveLength(7);
+  });
+
+  it("leaves the home streak section blank before a name is saved", () => {
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    expect(screen.queryByLabelText("Recent streak")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Streak loading")).not.toBeInTheDocument();
+    expect(screen.queryByText("Start your streak today.")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".home-streak-spot")).toHaveLength(0);
   });
 });
 
@@ -703,6 +890,14 @@ function finishVocabDismissal() {
   fireEvent(screen.getByTestId("vocab-sheet"), event);
 }
 
+function finishLeaderboardDismissal() {
+  const event = new Event("animationend", { bubbles: true });
+  Object.defineProperty(event, "animationName", {
+    value: "bottom-sheet-slide-down"
+  });
+  fireEvent(screen.getByTestId("leaderboard-sheet"), event);
+}
+
 function createMemoryStorage(): StorageLike {
   const entries = new Map<string, string>();
   return {
@@ -712,17 +907,28 @@ function createMemoryStorage(): StorageLike {
   };
 }
 
-function makeDailyResult(dateKey: string, studentName: string): DailyResult {
+function makeDailyResult(
+  dateKey: string,
+  studentName: string,
+  medal: DailyResult["medal"] = "practice"
+): DailyResult {
   return {
     dateKey,
     studentName,
     totalScore: 0,
     maxScore: 390,
-    medal: "practice",
+    medal,
     completedAt: new Date().toISOString(),
     questionResults: [],
     shareText: ""
   };
+}
+
+function offsetDateKey(dateKey: string, offsetDays: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
 }
 
 function getWrongChoiceIds(problem: (typeof problems)[number]): string[] {
