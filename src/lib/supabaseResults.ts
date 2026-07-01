@@ -1,4 +1,5 @@
 import { getStudentKey, normalizeStudentName } from "@/lib/storage";
+import { isDisallowedStudentName } from "@/lib/studentNamePolicy";
 import type { DailyResult, Medal, QuestionResult } from "@/lib/types";
 
 type SupabaseConfig = {
@@ -51,6 +52,10 @@ export class SupabaseNotConfiguredError extends Error {
 }
 
 export async function loadSupabaseHistory(studentName: string): Promise<DailyResult[]> {
+  if (isDisallowedStudentName(studentName)) {
+    return [];
+  }
+
   const student = await findStudent(studentName);
   if (!student) {
     return [];
@@ -78,6 +83,13 @@ export async function loadSupabaseHistory(studentName: string): Promise<DailyRes
 }
 
 export async function saveSupabaseDailyResult(result: DailyResult): Promise<DailyResult> {
+  if (isDisallowedStudentName(result.studentName)) {
+    return {
+      ...result,
+      studentName: normalizeStudentName(result.studentName)
+    };
+  }
+
   const student = await getOrCreateStudent(result.studentName);
   const studentName = normalizeStudentName(result.studentName);
   const existingResult = await findDailyResult(student.id, result.dateKey);

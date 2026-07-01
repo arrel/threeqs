@@ -1,4 +1,5 @@
 import { previousDateKey } from "@/lib/date";
+import { isDisallowedStudentName } from "@/lib/studentNamePolicy";
 import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
 import type { DailyResult, QuestionResult } from "@/lib/types";
 
@@ -126,7 +127,7 @@ export function saveStudentName(name: string, storage = getBrowserStorage()): vo
   }
 
   const studentName = normalizeStudentName(name);
-  if (!studentName) {
+  if (!studentName || isDisallowedStudentName(studentName)) {
     return;
   }
 
@@ -261,7 +262,7 @@ export function saveDailyDraft(draft: DailyDraft, storage = getBrowserStorage())
   }
 
   const studentName = normalizeStudentName(draft.studentName);
-  if (!studentName || !draft.dateKey) {
+  if (!studentName || isDisallowedStudentName(studentName) || !draft.dateKey) {
     return;
   }
 
@@ -324,7 +325,7 @@ export function getDailyResult(
 
 export function saveDailyResult(result: DailyResult, storage = getBrowserStorage()): void {
   const studentKey = getStudentKey(result.studentName);
-  if (!studentKey) {
+  if (!studentKey || isDisallowedStudentName(result.studentName)) {
     return;
   }
 
@@ -345,7 +346,7 @@ export function replaceStudentHistory(
   storage = getBrowserStorage()
 ): void {
   const studentKey = getStudentKey(name);
-  if (!studentKey) {
+  if (!studentKey || isDisallowedStudentName(name)) {
     return;
   }
 
