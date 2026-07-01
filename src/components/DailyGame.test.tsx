@@ -89,7 +89,7 @@ describe("DailyGame", () => {
       }),
     ).toBeInTheDocument();
     expect(getButtonByText(/^I'm Ready$/i)).toBeInTheDocument();
-    expect(getButtonByText(/^I don't like advice$/i)).toBeInTheDocument();
+    expect(getButtonByText(/^I don't like good advice$/i)).toBeInTheDocument();
 
     await user.click(screen.getByLabelText("Back"));
 
@@ -98,8 +98,8 @@ describe("DailyGame", () => {
     ).toBeInTheDocument();
 
     await user.click(getButtonByText(/^play$/i));
-    await screen.findByText(/^I don't like advice$/i);
-    await user.click(getButtonByText(/^I don't like advice$/i));
+    await screen.findByText(/^I don't like good advice$/i);
+    await user.click(getButtonByText(/^I don't like good advice$/i));
 
     expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
   });

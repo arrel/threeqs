@@ -924,7 +924,7 @@ function ReadyScreen({ onBack, onContinue }: ReadyScreenProps) {
           I&apos;m Ready
         </button>
         <button className="secondary-action" onClick={onContinue} type="button">
-          I don&apos;t like advice
+          I don&apos;t like good advice
         </button>
       </div>
     </section>
