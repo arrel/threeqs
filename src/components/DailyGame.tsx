@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
 import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
 import { MathText } from "@/components/MathText";
@@ -93,7 +93,7 @@ export function DailyGame({
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(shouldUseRemoteResults);
   const [isHomeHistoryLoading, setIsHomeHistoryLoading] = useState(shouldUseRemoteResults);
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [isSwitchingPlayer, setIsSwitchingPlayer] = useState(false);
   const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
@@ -120,18 +120,32 @@ export function DailyGame({
     setIsTimerPaused(isPaused);
   }, []);
 
+  const handleSwitchPlayer = useCallback(() => {
+    setNameInput("");
+    setIsSwitchingPlayer(true);
+  }, []);
+
+  const handleCancelSwitchPlayer = useCallback(() => {
+    setIsSwitchingPlayer(false);
+    setNameInput("");
+  }, []);
+
   useEffect(() => {
     setHasLoadedProfile(false);
     const savedName = getSavedStudentName(activeStorage);
 
     if (!savedName) {
+      setNameInput("");
+      setStudentName("");
+      setHistory([]);
+      setHomeHistory([]);
       setIsProfileLoading(false);
       setIsHomeHistoryLoading(false);
       setHasLoadedProfile(true);
       return;
     }
 
-    setNameInput(savedName);
+    setNameInput("");
     setStudentName(savedName);
     const savedHistory = getStudentHistory(savedName, activeStorage);
     setHistory(savedHistory);
@@ -146,13 +160,17 @@ export function DailyGame({
   }, [activeStorage, shouldUseRemoteResults]);
 
   useEffect(() => {
-    if (!trimmedInput) {
+    if (mode !== "home" || isStarting) {
+      return undefined;
+    }
+
+    if (!studentName) {
       setHomeHistory([]);
       setIsHomeHistoryLoading(false);
       return undefined;
     }
 
-    const localHistory = getStudentHistory(trimmedInput, activeStorage);
+    const localHistory = getStudentHistory(studentName, activeStorage);
     setHomeHistory(localHistory);
 
     if (!shouldUseRemoteResults) {
@@ -165,7 +183,7 @@ export function DailyGame({
     // skeleton when there's nothing stored locally to display yet.
     setIsHomeHistoryLoading(localHistory.length === 0);
 
-    loadRemoteHistoryWithLocalFallback(trimmedInput, activeStorage)
+    loadRemoteHistoryWithLocalFallback(studentName, activeStorage)
       .then((remoteHistory) => {
         if (!isCanceled) {
           setHomeHistory(remoteHistory);
@@ -185,7 +203,7 @@ export function DailyGame({
     return () => {
       isCanceled = true;
     };
-  }, [activeStorage, shouldUseRemoteResults, trimmedInput]);
+  }, [activeStorage, isStarting, mode, shouldUseRemoteResults, studentName]);
 
   useEffect(() => {
     if (!shouldUseRemoteResults || mode !== "home") {
@@ -252,7 +270,6 @@ export function DailyGame({
     const savedHistory = getStudentHistory(savedName, activeStorage);
     const existingResult = savedHistory.find((result) => result.dateKey === dateKey);
 
-    setNameInput(savedName);
     setStudentName(savedName);
     setHistory(savedHistory);
     setHomeHistory(savedHistory);
@@ -514,19 +531,22 @@ export function DailyGame({
   async function handleStart(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!trimmedInput || isStarting) {
+    const nextStudentName = trimmedInput || studentName;
+
+    if (!nextStudentName || isStarting) {
       return;
     }
 
-    saveStudentName(trimmedInput, activeStorage);
-    setStudentName(trimmedInput);
-    setIsEditingName(false);
+    saveStudentName(nextStudentName, activeStorage);
+    setStudentName(nextStudentName);
+    setNameInput("");
+    setIsSwitchingPlayer(false);
     setIsStarting(true);
 
     try {
       const nextHistory = shouldUseRemoteResults
-        ? await loadRemoteHistoryWithLocalFallback(trimmedInput, activeStorage)
-        : getStudentHistory(trimmedInput, activeStorage);
+        ? await loadRemoteHistoryWithLocalFallback(nextStudentName, activeStorage)
+        : getStudentHistory(nextStudentName, activeStorage);
       const existingResult = nextHistory.find((result) => result.dateKey === dateKey);
       setHistory(nextHistory);
       setHomeHistory(nextHistory);
@@ -540,7 +560,7 @@ export function DailyGame({
         return;
       }
 
-      const draft = getDailyDraft(trimmedInput, dateKey, activeStorage);
+      const draft = getDailyDraft(nextStudentName, dateKey, activeStorage);
       if (draft) {
         const firstIncompleteQuestionIndex = getFirstIncompleteQuestionIndex(
           draft.questionResults,
@@ -548,7 +568,7 @@ export function DailyGame({
         );
 
         if (firstIncompleteQuestionIndex >= dailyProblems.length) {
-          restoreDraftResultsRoute(trimmedInput, draft);
+          restoreDraftResultsRoute(nextStudentName, draft);
           navigateTo({ screen: "results" });
           return;
         }
@@ -563,7 +583,7 @@ export function DailyGame({
       }
 
       if (
-        studentName === trimmedInput &&
+        studentName === nextStudentName &&
         (questionResults.some(Boolean) ||
           attemptedChoiceIds.length > 0 ||
           Boolean(checkedResult) ||
@@ -836,16 +856,17 @@ export function DailyGame({
       {mode === "home" ? (
         <HomeScreen
           dateKey={dateKey}
-          isEditingName={isEditingName}
           isHomeHistoryLoading={isHomeHistoryLoading}
           isLeaderboardLoading={isLeaderboardLoading}
           isProfileLoading={isProfileLoading}
           isStarting={isStarting}
+          isSwitchingPlayer={isSwitchingPlayer}
           leaderboard={leaderboard}
           history={homeHistory}
           nameInput={nameInput}
-          onEditName={() => setIsEditingName(true)}
+          onCancelSwitchPlayer={handleCancelSwitchPlayer}
           onNameChange={setNameInput}
+          onSwitchPlayer={handleSwitchPlayer}
           onSubmit={handleStart}
           savedName={studentName}
         />
@@ -932,126 +953,176 @@ function ReadyScreen({ onBack, onContinue }: ReadyScreenProps) {
 
 type HomeScreenProps = {
   dateKey: string;
-  isEditingName: boolean;
   isHomeHistoryLoading: boolean;
   isLeaderboardLoading: boolean;
   isProfileLoading: boolean;
   isStarting: boolean;
+  isSwitchingPlayer: boolean;
   leaderboard: LeaderboardEntry[];
   history: DailyResult[];
   nameInput: string;
-  onEditName(): void;
+  onCancelSwitchPlayer(): void;
   onNameChange(name: string): void;
+  onSwitchPlayer(): void;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   savedName: string;
 };
 
 function HomeScreen({
   dateKey,
-  isEditingName,
   isHomeHistoryLoading,
   isLeaderboardLoading,
   isProfileLoading,
   isStarting,
+  isSwitchingPlayer,
   leaderboard,
   history,
   nameInput,
-  onEditName,
+  onCancelSwitchPlayer,
   onNameChange,
+  onSwitchPlayer,
   onSubmit,
   savedName
 }: HomeScreenProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
-  const showNameInput = !savedName || isEditingName;
   const nameLabelId = "student-name-label";
+  const switchNameLabelId = "switch-player-name-label";
   const leaderboardPosition = getLeaderboardPosition(leaderboard, savedName);
   const streakDays = buildHomeStreakDays(history, dateKey);
+  const primaryActionLabel = savedName ? `Continue as ${savedName}` : "Play";
+  const isPrimaryActionDisabled = isStarting || (!savedName && !normalizeStudentName(nameInput));
+  const switchTargetName = normalizeStudentName(nameInput);
 
   return (
     <section className="app-card home-card" aria-label="Three Qs home">
-      <div className="home-topbar">
-        <p className="today-label home-date">{formatDateKey(dateKey)}</p>
-        <button
-          aria-label={
-            leaderboardPosition
-              ? `Open leaderboard, you are #${leaderboardPosition}`
-              : "Open leaderboard"
-          }
-          className="leaderboard-trigger"
-          onClick={() => setIsLeaderboardOpen(true)}
-          type="button"
-        >
-          <Trophy size={17} />
-          <span>{leaderboardPosition ? `#${leaderboardPosition}` : "Leaderboard"}</span>
-        </button>
-      </div>
-
-      <div aria-hidden="true" />
-
-      <div className="home-copy">
-        <h1 className="home-wordmark">
-          Three<span className="home-wordmark-qs">Qs</span>
-        </h1>
-        <p>Your daily math superbowl challenge</p>
-      </div>
-
-      <div aria-hidden="true" />
-
-      {savedName ? (
-        <HomeStreakStrip
-          days={streakDays.days}
-          hasActiveDay={streakDays.hasActiveDay}
-          isLoading={isHomeHistoryLoading}
-        />
-      ) : (
-        <div className="home-streak-blank" aria-hidden="true" />
-      )}
-
-      <div aria-hidden="true" />
-
-      <form className="home-form" onSubmit={onSubmit}>
-        <div className="name-field">
-          <span className="name-field-label" id={nameLabelId}>
-            Your Name
-          </span>
-          {isProfileLoading ? (
-            <div aria-label="Name loading" className="name-loading" role="status">
-              <span aria-hidden="true" className="name-skeleton-bar" />
-            </div>
-          ) : showNameInput ? (
-            <input
-              autoFocus={isEditingName}
-              aria-labelledby={nameLabelId}
-              className="name-input"
-              name="studentName"
-              onChange={(event) => onNameChange(event.target.value)}
-              placeholder="Type your name"
-              value={nameInput}
-            />
-          ) : (
-            <div aria-labelledby={nameLabelId} className="name-display">
-              <span className="name-display-text">{savedName}</span>
-              <button
-                aria-label="Edit name"
-                className="name-edit-btn"
-                onClick={onEditName}
-                type="button"
-              >
-                <Pencil size={15} />
-              </button>
-            </div>
-          )}
+      <div className="home-content">
+        <div className="home-topbar">
+          <p className="today-label home-date">{formatDateKey(dateKey)}</p>
+          <button
+            aria-label={
+              leaderboardPosition
+                ? `Open leaderboard, you are #${leaderboardPosition}`
+                : "Open leaderboard"
+            }
+            className="leaderboard-trigger"
+            onClick={() => setIsLeaderboardOpen(true)}
+            type="button"
+          >
+            <Trophy size={17} />
+            <span>{leaderboardPosition ? `#${leaderboardPosition}` : "Leaderboard"}</span>
+          </button>
         </div>
 
-        <button
-          className="primary-action home-play-action"
-          disabled={!normalizeStudentName(nameInput) || isStarting}
-          type="submit"
-        >
-          <Play size={19} fill="currentColor" />
-          Play
-        </button>
-      </form>
+        <div aria-hidden="true" />
+
+        <div className="home-copy">
+          <h1 className="home-wordmark">
+            Three<span className="home-wordmark-qs">Qs</span>
+          </h1>
+          <p>Your daily math superbowl challenge</p>
+        </div>
+
+        <div aria-hidden="true" />
+
+        {savedName ? (
+          <HomeStreakStrip
+            days={streakDays.days}
+            hasActiveDay={streakDays.hasActiveDay}
+            isLoading={isHomeHistoryLoading}
+          />
+        ) : (
+          <div className="home-streak-blank" aria-hidden="true" />
+        )}
+
+        <div aria-hidden="true" />
+
+        <form className="home-form" onSubmit={onSubmit}>
+          <div className="name-field">
+            <span className="name-field-label" id={nameLabelId}>
+              {savedName ? "Player" : "Your Name"}
+            </span>
+            {isProfileLoading ? (
+              <div aria-label="Name loading" className="name-loading" role="status">
+                <span aria-hidden="true" className="name-skeleton-bar" />
+              </div>
+            ) : savedName ? (
+              <div aria-labelledby={nameLabelId} className="name-display">
+                <span className="name-avatar" aria-hidden="true">
+                  <UserRound size={19} />
+                </span>
+                <span className="name-display-text">{savedName}</span>
+                <button className="name-switch-btn" onClick={onSwitchPlayer} type="button">
+                  Switch
+                </button>
+              </div>
+            ) : (
+              <input
+                aria-labelledby={nameLabelId}
+                className="name-input"
+                name="studentName"
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="Type your name"
+                value={nameInput}
+              />
+            )}
+          </div>
+
+          <button
+            className="primary-action home-play-action"
+            disabled={isPrimaryActionDisabled}
+            type="submit"
+          >
+            <Play size={19} fill="currentColor" />
+            {primaryActionLabel}
+          </button>
+        </form>
+      </div>
+
+      <BottomSheet
+        backdropTestId="switch-player-backdrop"
+        className="switch-player-sheet"
+        closeLabel="Cancel switching player"
+        onDismiss={onCancelSwitchPlayer}
+        open={isSwitchingPlayer}
+        testId="switch-player-sheet"
+        title="Switch Player"
+        titleId="switch-player-sheet-title"
+      >
+        <form className="switch-player-form" onSubmit={onSubmit}>
+          <div className="switch-player-panel">
+            <div className="switch-player-current">
+              <span className="switch-player-current-icon" aria-hidden="true">
+                <UserRound size={16} />
+              </span>
+              <span className="switch-player-current-copy">
+                <span className="switch-player-kicker">Playing as</span>
+                <span className="current-player-name">{savedName}</span>
+              </span>
+            </div>
+            <label className="switch-player-target" htmlFor="switch-player-name">
+              <span className="switch-player-kicker" id={switchNameLabelId}>
+                Continue as
+              </span>
+              <input
+                aria-labelledby={switchNameLabelId}
+                className="switch-player-input"
+                id="switch-player-name"
+                name="studentName"
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="New player name"
+                value={nameInput}
+              />
+            </label>
+          </div>
+          <button
+            className="primary-action"
+            disabled={!switchTargetName || isStarting}
+            type="submit"
+          >
+            {switchTargetName ? `Continue as ${switchTargetName}` : "Continue as this player"}
+          </button>
+        </form>
+      </BottomSheet>
 
       <BottomSheet
         backdropTestId="leaderboard-backdrop"

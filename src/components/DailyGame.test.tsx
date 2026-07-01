@@ -97,7 +97,7 @@ describe("DailyGame", () => {
       screen.getByRole("heading", { name: "ThreeQs" }),
     ).toBeInTheDocument();
 
-    await user.click(getButtonByText(/^play$/i));
+    await user.click(screen.getByRole("button", { name: /^continue as /i }));
     await screen.findByText(/^I don't like good advice$/i);
     await user.click(getButtonByText(/^I don't like good advice$/i));
 
@@ -746,11 +746,14 @@ describe("DailyGame", () => {
 
     render(<DailyGame today={today} />);
 
-    expect(screen.getByText("Your Name")).toBeInTheDocument();
+    expect(screen.getByText("Player")).toBeInTheDocument();
     expect(
       await screen.findByText("Ada", { selector: ".name-display-text" }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Edit name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Continue as Ada" }),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText("Name loading")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Streak loading")).toBeInTheDocument();
     expect(screen.queryByLabelText("Recent streak")).not.toBeInTheDocument();
@@ -760,6 +763,68 @@ describe("DailyGame", () => {
 
     expect(await screen.findByLabelText("Recent streak")).toBeInTheDocument();
     expect(screen.getByText("Start your streak today.")).toBeInTheDocument();
+  });
+
+  it("does not load another player's history while a switched name is still being typed", async () => {
+    const user = userEvent.setup();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const pendingHistoryResponses: Array<() => void> = [];
+    let historyRequests = 0;
+
+    saveStudentName("Ada", window.localStorage);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/api/leaderboard")) {
+          return jsonResponse({ entries: [] });
+        }
+
+        if (url.includes("/api/results")) {
+          historyRequests += 1;
+          return new Promise<Response>((resolve) => {
+            pendingHistoryResponses.push(() =>
+              resolve(jsonResponse({ results: [] })),
+            );
+          });
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      }),
+    );
+
+    render(<DailyGame today={today} />);
+
+    await screen.findByText("Ada", { selector: ".name-display-text" });
+    await waitFor(() => expect(historyRequests).toBe(1));
+
+    await user.click(screen.getByRole("button", { name: "Switch" }));
+    const switchSheet = await screen.findByRole("dialog", {
+      name: "Switch Player",
+    });
+    await user.type(within(switchSheet).getByPlaceholderText(/new player name/i), "Lin");
+    expect(historyRequests).toBe(1);
+
+    resolveNextResponse(pendingHistoryResponses);
+    await user.click(
+      within(switchSheet).getByRole("button", {
+        name: "Continue as Lin",
+      }),
+    );
+
+    await waitFor(() => expect(historyRequests).toBe(2));
+    resolveNextResponse(pendingHistoryResponses);
+    expect(
+      await screen.findByRole("heading", {
+        name: /do you have your pencil and paper ready/i,
+      }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Back"));
+    expect(
+      await screen.findByText("Lin", { selector: ".name-display-text" }),
+    ).toBeInTheDocument();
   });
 
   it("shows the cached streak immediately while saved remote history revalidates", async () => {
@@ -1000,7 +1065,10 @@ function getButtonByText(text: RegExp): HTMLButtonElement {
 async function startFromHome(
   user: ReturnType<typeof userEvent.setup>,
 ): Promise<void> {
-  await user.click(getButtonByText(/^play$/i));
+  const startButton =
+    screen.queryByRole("button", { name: /^play$/i }) ??
+    screen.getByRole("button", { name: /^continue as /i });
+  await user.click(startButton);
 
   await waitFor(() => {
     const isReady = screen.queryByText(/^I'm Ready$/i);
