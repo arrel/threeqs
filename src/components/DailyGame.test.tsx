@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DailyGame } from "@/components/DailyGame";
@@ -9,7 +15,7 @@ import {
   replaceStudentHistory,
   saveCachedLeaderboard,
   saveStudentName,
-  type StorageLike
+  type StorageLike,
 } from "@/lib/storage";
 import type { DailyResult } from "@/lib/types";
 
@@ -30,7 +36,7 @@ describe("DailyGame", () => {
     const { rerender } = render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
 
     for (const problem of dailyProblems) {
       await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
@@ -45,16 +51,17 @@ describe("DailyGame", () => {
     await user.click(getButtonByText(/^continue$/i));
     expect(screen.getByText(/current streak/i)).toBeInTheDocument();
     await user.click(getButtonByText(/^continue$/i));
-    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "ThreeQs" }),
+    ).toBeInTheDocument();
 
     rerender(<DailyGame storage={storage} today={today} />);
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
 
     expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
-    expect(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`)).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
+    expect(
+      screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(getButtonByText(/^next$/i)).toBeInTheDocument();
     expect(screen.queryByText(/^check$/i)).not.toBeInTheDocument();
 
@@ -64,6 +71,37 @@ describe("DailyGame", () => {
 
     expect(screen.getByText(/challenge complete/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Question 1 of 3/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a pencil and paper check before the first fresh question", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+
+    render(<DailyGame storage={storage} today={today} />);
+
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await user.click(getButtonByText(/^play$/i));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Do you have your pencil and paper ready?",
+      }),
+    ).toBeInTheDocument();
+    expect(getButtonByText(/^I'm Ready$/i)).toBeInTheDocument();
+    expect(getButtonByText(/^I don't like good advice$/i)).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Back"));
+
+    expect(
+      screen.getByRole("heading", { name: "ThreeQs" }),
+    ).toBeInTheDocument();
+
+    await user.click(getButtonByText(/^play$/i));
+    await screen.findByText(/^I don't like good advice$/i);
+    await user.click(getButtonByText(/^I don't like good advice$/i));
+
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
   });
 
   it("uses the back button to revisit answered questions and return home from the first question", async () => {
@@ -76,9 +114,11 @@ describe("DailyGame", () => {
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
 
-    await user.click(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`));
+    await user.click(
+      screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`),
+    );
     await user.click(getButtonByText(/^check$/i));
     await user.click(getButtonByText(/^next$/i));
 
@@ -87,16 +127,17 @@ describe("DailyGame", () => {
     await user.click(screen.getByLabelText("Back"));
 
     expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
-    expect(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`)).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
+    expect(
+      screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(getButtonByText(/^next$/i)).toBeInTheDocument();
     expect(screen.queryByText(/^check$/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByLabelText("Back"));
 
-    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "ThreeQs" }),
+    ).toBeInTheDocument();
   });
 
   it("allows one retry and reviews the first wrong guess with the correct answer", async () => {
@@ -110,7 +151,7 @@ describe("DailyGame", () => {
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
     await user.click(screen.getByTestId(`choice-${wrongChoiceId}`));
     await user.click(getButtonByText(/^check$/i));
 
@@ -130,7 +171,9 @@ describe("DailyGame", () => {
     await user.click(screen.getByLabelText("Back"));
 
     expect(screen.getByTestId(`choice-${wrongChoiceId}`)).toHaveClass("wrong");
-    expect(screen.getByTestId(`choice-${problem.correctChoiceId}`)).toHaveClass("correct");
+    expect(screen.getByTestId(`choice-${problem.correctChoiceId}`)).toHaveClass(
+      "correct",
+    );
     expect(getButtonByText(/^next$/i)).toBeInTheDocument();
   });
 
@@ -142,17 +185,24 @@ describe("DailyGame", () => {
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
 
-    const promptVocabButton = document.querySelector<HTMLButtonElement>("button.vocab-word");
+    const promptVocabButton =
+      document.querySelector<HTMLButtonElement>("button.vocab-word");
     expect(promptVocabButton).not.toBeNull();
     await user.click(promptVocabButton as HTMLButtonElement);
 
     const vocabDialog = screen.getByRole("dialog", { name: /words to know/i });
     expect(vocabDialog).toBeInTheDocument();
-    expect(within(vocabDialog).queryByText(/^Vocabulary$/i)).not.toBeInTheDocument();
-    expect(within(vocabDialog).getByText(/^Prime Factorization$/i)).toBeInTheDocument();
-    expect(within(vocabDialog).getByText(/prime numbers multiplied together/i)).toBeInTheDocument();
+    expect(
+      within(vocabDialog).queryByText(/^Vocabulary$/i),
+    ).not.toBeInTheDocument();
+    expect(
+      within(vocabDialog).getByText(/^Prime Factorization$/i),
+    ).toBeInTheDocument();
+    expect(
+      within(vocabDialog).getByText(/prime numbers multiplied together/i),
+    ).toBeInTheDocument();
 
     fireEvent.pointerDown(screen.getByTestId("vocab-backdrop"));
 
@@ -160,12 +210,16 @@ describe("DailyGame", () => {
     finishVocabDismissal();
 
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: /words to know/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("dialog", { name: /words to know/i }),
+      ).not.toBeInTheDocument();
     });
 
     await user.click(screen.getByLabelText(/open vocabulary help/i));
 
-    expect(screen.getByRole("dialog", { name: /words to know/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: /words to know/i }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByLabelText(/close vocabulary help/i));
 
@@ -173,7 +227,9 @@ describe("DailyGame", () => {
     finishVocabDismissal();
 
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: /words to know/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("dialog", { name: /words to know/i }),
+      ).not.toBeInTheDocument();
     });
 
     await user.click(screen.getByLabelText(/open vocabulary help/i));
@@ -187,7 +243,9 @@ describe("DailyGame", () => {
     finishVocabDismissal();
 
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: /words to know/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("dialog", { name: /words to know/i }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -199,7 +257,7 @@ describe("DailyGame", () => {
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
     await user.click(screen.getByLabelText(/open vocabulary help/i));
 
     const vocabDialog = screen.getByRole("dialog", { name: /words to know/i });
@@ -217,7 +275,7 @@ describe("DailyGame", () => {
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
 
     expect(document.body).toHaveTextContent("$12.50");
     expect(screen.getByText("$20.00")).toBeInTheDocument();
@@ -229,15 +287,21 @@ describe("DailyGame", () => {
     const storage = createMemoryStorage();
     const today = new Date("2026-06-24T18:00:00Z");
 
-    render(<DailyGame idlePromptAfterMs={250} storage={storage} today={today} />);
+    render(
+      <DailyGame idlePromptAfterMs={250} storage={storage} today={today} />,
+    );
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
     expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
 
     // No interaction for the idle window: the prompt covers the question.
-    const idleDialog = await screen.findByRole("dialog", { name: /are you still here/i });
-    expect(within(idleDialog).getByText(/timer is paused/i)).toBeInTheDocument();
+    const idleDialog = await screen.findByRole("dialog", {
+      name: /are you still here/i,
+    });
+    expect(
+      within(idleDialog).getByText(/timer is paused/i),
+    ).toBeInTheDocument();
 
     // Dismissing it begins closing the sheet, which resumes the question clock.
     await user.click(getButtonByText(/i.m still here/i));
@@ -250,12 +314,13 @@ describe("DailyGame", () => {
     const today = new Date("2026-06-24T18:00:00Z");
     const dateKey = getPacificDateKey(today);
     const [problem] = selectDailyProblems(problems, dateKey);
-    const [firstWrongChoiceId, secondWrongChoiceId] = getWrongChoiceIds(problem);
+    const [firstWrongChoiceId, secondWrongChoiceId] =
+      getWrongChoiceIds(problem);
 
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
     await user.click(screen.getByTestId(`choice-${firstWrongChoiceId}`));
     await user.click(getButtonByText(/^check$/i));
     await user.click(getButtonByText(/^try again$/i));
@@ -264,9 +329,15 @@ describe("DailyGame", () => {
 
     expect(screen.getByText(/^not quite$/i)).toBeInTheDocument();
     expect(screen.queryByText(/^try again$/i)).not.toBeInTheDocument();
-    expect(screen.getByTestId(`choice-${firstWrongChoiceId}`)).toHaveClass("wrong");
-    expect(screen.getByTestId(`choice-${secondWrongChoiceId}`)).toHaveClass("wrong");
-    expect(screen.getByTestId(`choice-${problem.correctChoiceId}`)).not.toHaveClass("correct");
+    expect(screen.getByTestId(`choice-${firstWrongChoiceId}`)).toHaveClass(
+      "wrong",
+    );
+    expect(screen.getByTestId(`choice-${secondWrongChoiceId}`)).toHaveClass(
+      "wrong",
+    );
+    expect(
+      screen.getByTestId(`choice-${problem.correctChoiceId}`),
+    ).not.toHaveClass("correct");
   });
 
   it("resumes an answered first question after returning home", async () => {
@@ -279,16 +350,20 @@ describe("DailyGame", () => {
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
     await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
     await user.click(getButtonByText(/^check$/i));
     await user.click(screen.getByLabelText("Back"));
 
-    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "ThreeQs" }),
+    ).toBeInTheDocument();
 
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
 
-    expect(screen.getByTestId(`choice-${problem.correctChoiceId}`)).toHaveClass("correct");
+    expect(screen.getByTestId(`choice-${problem.correctChoiceId}`)).toHaveClass(
+      "correct",
+    );
     expect(getButtonByText(/^next$/i)).toBeInTheDocument();
     expect(screen.queryByText(/^check$/i)).not.toBeInTheDocument();
   });
@@ -308,22 +383,26 @@ describe("DailyGame", () => {
     render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
     expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
 
     // Spend 5 active seconds on the first question, then leave for home.
     clock = 6_000;
     await user.click(screen.getByLabelText("Back"));
-    expect(screen.getByRole("heading", { name: "ThreeQs" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "ThreeQs" }),
+    ).toBeInTheDocument();
 
     // 100 seconds pass while the question is off screen — these must not count.
     clock = 106_000;
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
     expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
 
     // 3 more active seconds, then answer. Recorded time should be ~8s, not ~108s.
     clock = 109_000;
-    await user.click(screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`));
+    await user.click(
+      screen.getByTestId(`choice-${dailyProblems[0].correctChoiceId}`),
+    );
     await user.click(getButtonByText(/^check$/i));
     await user.click(getButtonByText(/^next$/i));
 
@@ -349,7 +428,7 @@ describe("DailyGame", () => {
         route={{ screen: "question", questionIndex: 0 }}
         storage={storage}
         today={today}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -369,7 +448,7 @@ describe("DailyGame", () => {
         route={{ screen: "question", questionIndex: 1 }}
         storage={storage}
         today={today}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -387,8 +466,10 @@ describe("DailyGame", () => {
     const { unmount } = render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
-    await user.click(screen.getByTestId(`choice-${firstProblem.correctChoiceId}`));
+    await startFromHome(user);
+    await user.click(
+      screen.getByTestId(`choice-${firstProblem.correctChoiceId}`),
+    );
     await user.click(getButtonByText(/^check$/i));
     await user.click(getButtonByText(/^next$/i));
     expect(screen.getByLabelText(/Question 2 of 3/i)).toBeInTheDocument();
@@ -402,10 +483,12 @@ describe("DailyGame", () => {
         route={{ screen: "question", questionIndex: 1 }}
         storage={storage}
         today={today}
-      />
+      />,
     );
 
-    expect(await screen.findByLabelText(/Question 2 of 3/i)).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText(/Question 2 of 3/i),
+    ).toBeInTheDocument();
     expect(routeChange).not.toHaveBeenCalledWith({ screen: "home" }, "replace");
   });
 
@@ -419,8 +502,10 @@ describe("DailyGame", () => {
     const { unmount } = render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
-    await user.click(screen.getByTestId(`choice-${firstProblem.correctChoiceId}`));
+    await startFromHome(user);
+    await user.click(
+      screen.getByTestId(`choice-${firstProblem.correctChoiceId}`),
+    );
     await user.click(getButtonByText(/^check$/i));
     await user.click(getButtonByText(/^next$/i));
 
@@ -433,7 +518,7 @@ describe("DailyGame", () => {
         route={{ screen: "results" }}
         storage={storage}
         today={today}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -451,7 +536,7 @@ describe("DailyGame", () => {
     const { unmount } = render(<DailyGame storage={storage} today={today} />);
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
 
     for (const problem of dailyProblems) {
       await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
@@ -469,7 +554,7 @@ describe("DailyGame", () => {
         route={{ screen: "results" }}
         storage={storage}
         today={today}
-      />
+      />,
     );
 
     expect(await screen.findByText(/challenge complete/i)).toBeInTheDocument();
@@ -482,8 +567,16 @@ describe("DailyGame", () => {
     const dateKey = getPacificDateKey(today);
     const dailyProblems = selectDailyProblems(problems, dateKey);
     const leaderboardResponses = [
-      [{ studentName: "Riley", totalPoints: 210, gold: 0, silver: 1, bronze: 1 }],
-      [{ studentName: "Ada", totalPoints: 390, gold: 1, silver: 0, bronze: 0 }]
+      [
+        {
+          studentName: "Riley",
+          totalPoints: 210,
+          gold: 0,
+          silver: 1,
+          bronze: 1,
+        },
+      ],
+      [{ studentName: "Ada", totalPoints: 390, gold: 1, silver: 0, bronze: 0 }],
     ];
     const pendingLeaderboardResponses: Array<() => void> = [];
     let leaderboardRequests = 0;
@@ -495,10 +588,14 @@ describe("DailyGame", () => {
 
         if (url.includes("/api/leaderboard")) {
           const entries =
-            leaderboardResponses[Math.min(leaderboardRequests, leaderboardResponses.length - 1)];
+            leaderboardResponses[
+              Math.min(leaderboardRequests, leaderboardResponses.length - 1)
+            ];
           leaderboardRequests += 1;
           return new Promise<Response>((resolve) => {
-            pendingLeaderboardResponses.push(() => resolve(jsonResponse({ entries })));
+            pendingLeaderboardResponses.push(() =>
+              resolve(jsonResponse({ entries })),
+            );
           });
         }
 
@@ -512,7 +609,7 @@ describe("DailyGame", () => {
         }
 
         throw new Error(`Unhandled fetch: ${url}`);
-      })
+      }),
     );
 
     render(<DailyGame today={today} />);
@@ -532,7 +629,7 @@ describe("DailyGame", () => {
 
     await user.type(screen.getByLabelText(/your name/i), "Ada");
     expect(leaderboardRequests).toBe(1);
-    await user.click(getButtonByText(/^play$/i));
+    await startFromHome(user);
 
     for (const problem of dailyProblems) {
       await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
@@ -555,8 +652,12 @@ describe("DailyGame", () => {
     await waitFor(() => expect(leaderboardRequests).toBe(2));
     resolveNextResponse(pendingLeaderboardResponses);
 
-    expect(await screen.findByText("Ada", { selector: ".leaderboard-name" })).toBeInTheDocument();
-    expect(screen.queryByText("Riley", { selector: ".leaderboard-name" })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Ada", { selector: ".leaderboard-name" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Riley", { selector: ".leaderboard-name" }),
+    ).not.toBeInTheDocument();
     expect(leaderboardRequests).toBe(2);
   });
 
@@ -567,9 +668,9 @@ describe("DailyGame", () => {
     saveCachedLeaderboard(
       [
         { studentName: "Ada", totalPoints: 280, gold: 1, silver: 0, bronze: 0 },
-        { studentName: "Lin", totalPoints: 210, gold: 0, silver: 1, bronze: 0 }
+        { studentName: "Lin", totalPoints: 210, gold: 0, silver: 1, bronze: 0 },
       ],
-      window.localStorage
+      window.localStorage,
     );
     saveStudentName("Ada", window.localStorage);
 
@@ -589,7 +690,7 @@ describe("DailyGame", () => {
         }
 
         throw new Error(`Unhandled fetch: ${url}`);
-      })
+      }),
     );
 
     render(<DailyGame today={today} />);
@@ -605,8 +706,12 @@ describe("DailyGame", () => {
     // The empty refresh resolves but must not blank out the leaderboard.
     await waitFor(() => expect(leaderboardRequests).toBe(1));
 
-    expect(await screen.findByText("Ada", { selector: ".leaderboard-name" })).toBeInTheDocument();
-    expect(screen.getByText("Lin", { selector: ".leaderboard-name" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Ada", { selector: ".leaderboard-name" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Lin", { selector: ".leaderboard-name" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/top spot is yours/i)).not.toBeInTheDocument();
   });
 
@@ -629,18 +734,22 @@ describe("DailyGame", () => {
         if (url.includes("/api/results")) {
           historyRequests += 1;
           return new Promise<Response>((resolve) => {
-            pendingHistoryResponses.push(() => resolve(jsonResponse({ results: [] })));
+            pendingHistoryResponses.push(() =>
+              resolve(jsonResponse({ results: [] })),
+            );
           });
         }
 
         throw new Error(`Unhandled fetch: ${url}`);
-      })
+      }),
     );
 
     render(<DailyGame today={today} />);
 
     expect(screen.getByText("Your Name")).toBeInTheDocument();
-    expect(await screen.findByText("Ada", { selector: ".name-display-text" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Ada", { selector: ".name-display-text" }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Edit name")).toBeInTheDocument();
     expect(screen.queryByLabelText("Name loading")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Streak loading")).toBeInTheDocument();
@@ -660,7 +769,11 @@ describe("DailyGame", () => {
     let historyRequests = 0;
 
     saveStudentName("Ada", window.localStorage);
-    replaceStudentHistory("Ada", [makeDailyResult(dateKey, "Ada")], window.localStorage);
+    replaceStudentHistory(
+      "Ada",
+      [makeDailyResult(dateKey, "Ada")],
+      window.localStorage,
+    );
 
     vi.stubGlobal(
       "fetch",
@@ -674,12 +787,14 @@ describe("DailyGame", () => {
         if (url.includes("/api/results")) {
           historyRequests += 1;
           return new Promise<Response>((resolve) => {
-            pendingHistoryResponses.push(() => resolve(jsonResponse({ results: [] })));
+            pendingHistoryResponses.push(() =>
+              resolve(jsonResponse({ results: [] })),
+            );
           });
         }
 
         throw new Error(`Unhandled fetch: ${url}`);
-      })
+      }),
     );
 
     render(<DailyGame today={today} />);
@@ -882,10 +997,31 @@ function getButtonByText(text: RegExp): HTMLButtonElement {
   return button;
 }
 
+async function startFromHome(
+  user: ReturnType<typeof userEvent.setup>,
+): Promise<void> {
+  await user.click(getButtonByText(/^play$/i));
+
+  await waitFor(() => {
+    const isReady = screen.queryByText(/^I'm Ready$/i);
+    const isQuestion = screen.queryByLabelText(/Question [1-3] of 3/i);
+    const isScore = screen.queryByText(/challenge complete/i);
+
+    if (!isReady && !isQuestion && !isScore) {
+      throw new Error("Start did not leave the home screen.");
+    }
+  });
+
+  const readyButton = screen.queryByText(/^I'm Ready$/i)?.closest("button");
+  if (readyButton) {
+    await user.click(readyButton);
+  }
+}
+
 function finishVocabDismissal() {
   const event = new Event("animationend", { bubbles: true });
   Object.defineProperty(event, "animationName", {
-    value: "bottom-sheet-slide-down"
+    value: "bottom-sheet-slide-down",
   });
   fireEvent(screen.getByTestId("vocab-sheet"), event);
 }
@@ -903,7 +1039,7 @@ function createMemoryStorage(): StorageLike {
   return {
     getItem: (key) => entries.get(key) ?? null,
     setItem: (key, value) => entries.set(key, value),
-    removeItem: (key) => entries.delete(key)
+    removeItem: (key) => entries.delete(key),
   };
 }
 
@@ -920,7 +1056,7 @@ function makeDailyResult(
     medal,
     completedAt: new Date().toISOString(),
     questionResults: [],
-    shareText: ""
+    shareText: "",
   };
 }
 
@@ -940,9 +1076,9 @@ function getWrongChoiceIds(problem: (typeof problems)[number]): string[] {
 function jsonResponse(payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
-    status: 200
+    status: 200,
   });
 }
 

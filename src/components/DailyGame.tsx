@@ -46,10 +46,18 @@ type DailyGameProps = {
   idlePromptAfterMs?: number;
 };
 
-type GameMode = "home" | "quiz" | "review" | "score" | "streak";
+type GameMode = "home" | "ready" | "quiz" | "review" | "score" | "streak";
 
 // Pop the "Are you still here?" prompt after three solid minutes of inactivity.
 const IDLE_PROMPT_AFTER_MS = 3 * 60 * 1000;
+const READY_MESSAGES = [
+  "Your brain has a tiny whiteboard. Your paper has a giant one. Use the giant one.",
+  "Even mathematicians don’t solve hard problems in their heads. They write.",
+  "Scratch paper is extra working memory. Use it.",
+  "Every number you write down is one less number your brain has to remember.",
+  "Your brain is for thinking, not for remembering. Let your pencil remember the steps.",
+  "Don’t make your brain juggle numbers. Put them on paper and let your brain solve the problem."
+];
 
 export function DailyGame({
   onRouteChange,
@@ -263,6 +271,34 @@ export function DailyGame({
 
     if (route.screen === "streak") {
       forceHome();
+      return;
+    }
+
+    if (route.screen === "ready") {
+      if (draft) {
+        const firstIncompleteQuestionIndex = getFirstIncompleteQuestionIndex(
+          draft.questionResults,
+          dailyProblems.length
+        );
+        const questionIndex = Math.min(
+          clampQuestionIndex(draft.currentIndex, dailyProblems.length),
+          firstIncompleteQuestionIndex
+        );
+
+        restoreQuestionRoute(draft, questionIndex);
+        navigateTo({ screen: "question", questionIndex }, "replace");
+        return;
+      }
+
+      setCurrentResult(null);
+      setQuestionResults([]);
+      setCurrentIndex(0);
+      setSelectedChoiceId(null);
+      setAttemptedChoiceIds([]);
+      setCheckedResult(null);
+      setIsCurrentQuestionFinalized(false);
+      updateTimer(pausedTimer(0));
+      setMode("ready");
       return;
     }
 
@@ -542,12 +578,25 @@ export function DailyGame({
       setCurrentResult(null);
       setQuestionResults([]);
       setCurrentIndex(0);
-      startQuestion();
-      setMode("quiz");
-      navigateTo({ screen: "question", questionIndex: 0 });
+      setSelectedChoiceId(null);
+      setAttemptedChoiceIds([]);
+      setCheckedResult(null);
+      setIsCurrentQuestionFinalized(false);
+      updateTimer(pausedTimer(0));
+      setMode("ready");
+      navigateTo({ screen: "ready" });
     } finally {
       setIsStarting(false);
     }
+  }
+
+  function handleReadyContinue() {
+    setCurrentResult(null);
+    setQuestionResults([]);
+    setCurrentIndex(0);
+    startQuestion();
+    setMode("quiz");
+    navigateTo({ screen: "question", questionIndex: 0 });
   }
 
   function startQuestion() {
@@ -802,6 +851,10 @@ export function DailyGame({
         />
       ) : null}
 
+      {mode === "ready" ? (
+        <ReadyScreen onBack={showHome} onContinue={handleReadyContinue} />
+      ) : null}
+
       {mode === "quiz" || mode === "review" ? (
         <QuestionScreen
           attemptedChoiceIds={attemptedChoiceIds}
@@ -834,6 +887,46 @@ export function DailyGame({
         <StreakScreen onContinue={handleStreakContinue} streak={streak} />
       ) : null}
     </main>
+  );
+}
+
+type ReadyScreenProps = {
+  onBack(): void;
+  onContinue(): void;
+};
+
+function ReadyScreen({ onBack, onContinue }: ReadyScreenProps) {
+  const [message, setMessage] = useState(READY_MESSAGES[0]);
+
+  useEffect(() => {
+    setMessage(READY_MESSAGES[Math.floor(Math.random() * READY_MESSAGES.length)]);
+  }, []);
+
+  return (
+    <section className="app-card ready-card" aria-label="Pencil and paper check">
+      <header className="ready-topbar">
+        <button className="quiz-back-btn" aria-label="Back" onClick={onBack} type="button">
+          <ArrowLeft size={23} />
+        </button>
+      </header>
+
+      <div className="ready-copy">
+        <div className="ready-icon" aria-hidden="true">
+          <Pencil size={42} />
+        </div>
+        <h1>Do you have your pencil and paper ready?</h1>
+        <p>{message}</p>
+      </div>
+
+      <div className="ready-actions">
+        <button className="primary-action" onClick={onContinue} type="button">
+          I&apos;m Ready
+        </button>
+        <button className="secondary-action" onClick={onContinue} type="button">
+          I don&apos;t like good advice
+        </button>
+      </div>
+    </section>
   );
 }
 
