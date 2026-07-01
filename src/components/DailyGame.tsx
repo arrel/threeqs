@@ -8,7 +8,12 @@ import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems, shuffleWithSeed } from "@/lib/daily";
 import type { GameRoute, RouteNavigation } from "@/lib/gameRoutes";
-import { fetchLeaderboard, fetchRemoteHistory, saveRemoteDailyResult } from "@/lib/remoteResults";
+import {
+  fetchLeaderboard,
+  fetchRemoteHistory,
+  saveRemoteDailyResult,
+  type RemoteHistory
+} from "@/lib/remoteResults";
 import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
 import {
   MAX_ATTEMPTS,
@@ -21,6 +26,7 @@ import {
 import {
   calculateCurrentStreak,
   clearDailyDraft,
+  clearSavedStudentName,
   getCachedLeaderboard,
   getDailyDraft,
   getSavedStudentName,
@@ -186,7 +192,7 @@ export function DailyGame({
     loadRemoteHistoryWithLocalFallback(studentName, activeStorage)
       .then((remoteHistory) => {
         if (!isCanceled) {
-          setHomeHistory(remoteHistory);
+          setHomeHistory(remoteHistory.results);
         }
       })
       .catch(() => {
@@ -537,16 +543,23 @@ export function DailyGame({
       return;
     }
 
-    saveStudentName(nextStudentName, activeStorage);
     setStudentName(nextStudentName);
     setNameInput("");
     setIsSwitchingPlayer(false);
     setIsStarting(true);
 
     try {
-      const nextHistory = shouldUseRemoteResults
+      const historySnapshot = shouldUseRemoteResults
         ? await loadRemoteHistoryWithLocalFallback(nextStudentName, activeStorage)
-        : getStudentHistory(nextStudentName, activeStorage);
+        : { accepted: true, results: getStudentHistory(nextStudentName, activeStorage) };
+      const nextHistory = historySnapshot.results;
+
+      if (historySnapshot.accepted) {
+        saveStudentName(nextStudentName, activeStorage);
+      } else {
+        clearSavedStudentName(nextStudentName, activeStorage);
+      }
+
       const existingResult = nextHistory.find((result) => result.dateKey === dateKey);
       setHistory(nextHistory);
       setHomeHistory(nextHistory);
@@ -811,20 +824,30 @@ export function DailyGame({
 
     try {
       let savedResult = currentResult;
-      saveDailyResult(savedResult, activeStorage);
 
       if (shouldUseRemoteResults) {
         try {
-          savedResult = await saveRemoteDailyResult(currentResult);
-          saveDailyResult(savedResult, activeStorage);
+          const remoteSave = await saveRemoteDailyResult(currentResult);
+          savedResult = remoteSave.result;
+
+          if (remoteSave.accepted) {
+            saveDailyResult(savedResult, activeStorage);
+          } else {
+            clearSavedStudentName(savedResult.studentName, activeStorage);
+          }
         } catch {
+          saveDailyResult(savedResult, activeStorage);
           savedResult = currentResult;
         }
+      } else {
+        saveDailyResult(savedResult, activeStorage);
       }
 
-      const nextHistory = shouldUseRemoteResults
+      const historySnapshot = shouldUseRemoteResults
         ? await loadRemoteHistoryWithLocalFallback(savedResult.studentName, activeStorage)
-        : getStudentHistory(savedResult.studentName, activeStorage);
+        : { accepted: true, results: getStudentHistory(savedResult.studentName, activeStorage) };
+      const nextHistory = historySnapshot.results;
+
       clearDailyDraft(savedResult.studentName, dateKey, activeStorage);
       setHistory(nextHistory);
       setHomeHistory(nextHistory);
@@ -1920,14 +1943,24 @@ function getCompleteQuestionResults(results: QuestionResult[], totalQuestions: n
 async function loadRemoteHistoryWithLocalFallback(
   studentName: string,
   storage: StorageLike | undefined
-): Promise<DailyResult[]> {
+): Promise<RemoteHistory> {
   const localHistory = getStudentHistory(studentName, storage);
 
   try {
     const remoteHistory = await fetchRemoteHistory(studentName);
-    replaceStudentHistory(studentName, remoteHistory, storage);
+
+    if (remoteHistory.accepted) {
+      replaceStudentHistory(studentName, remoteHistory.results, storage);
+    } else {
+      clearSavedStudentName(studentName, storage);
+      replaceStudentHistory(studentName, [], storage);
+    }
+
     return remoteHistory;
   } catch {
-    return localHistory;
+    return {
+      accepted: true,
+      results: localHistory
+    };
   }
 }

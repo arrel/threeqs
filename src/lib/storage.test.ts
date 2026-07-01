@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateCurrentStreak,
+  clearSavedStudentName,
   getCachedLeaderboard,
   getDailyResult,
+  getSavedStudentName,
   getStudentHistory,
   normalizeStudentName,
   replaceStudentHistory,
   saveCachedLeaderboard,
   saveDailyResult,
+  saveStudentName,
   type StorageLike
 } from "@/lib/storage";
 import type { DailyResult } from "@/lib/types";
@@ -15,6 +18,15 @@ import type { DailyResult } from "@/lib/types";
 describe("local result storage", () => {
   it("normalizes student names", () => {
     expect(normalizeStudentName("  Ada   Lovelace ")).toBe("Ada Lovelace");
+  });
+
+  it("clears the saved student profile", () => {
+    const storage = createMemoryStorage();
+
+    saveStudentName("Ada", storage);
+    clearSavedStudentName("Ada", storage);
+
+    expect(getSavedStudentName(storage)).toBe("");
   });
 
   it("saves one result per student per date", () => {

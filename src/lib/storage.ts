@@ -139,6 +139,26 @@ export function saveStudentName(name: string, storage = getBrowserStorage()): vo
   );
 }
 
+export function clearSavedStudentName(
+  name?: string,
+  storage = getBrowserStorage()
+): void {
+  if (!storage) {
+    return;
+  }
+
+  if (name && getStudentKey(getSavedStudentName(storage)) !== getStudentKey(name)) {
+    return;
+  }
+
+  if (storage.removeItem) {
+    storage.removeItem(PROFILE_KEY);
+    return;
+  }
+
+  storage.setItem(PROFILE_KEY, "");
+}
+
 export function getCachedLeaderboard(storage = getBrowserStorage()): LeaderboardEntry[] | null {
   if (!storage) {
     return null;

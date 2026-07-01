@@ -2,10 +2,12 @@ import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
 import type { DailyResult } from "@/lib/types";
 
 type ResultsResponse = {
+  accepted?: boolean;
   results?: DailyResult[];
 };
 
 type SaveResponse = {
+  accepted?: boolean;
   result?: DailyResult;
 };
 
@@ -13,7 +15,17 @@ type LeaderboardResponse = {
   entries?: LeaderboardEntry[];
 };
 
-export async function fetchRemoteHistory(studentName: string): Promise<DailyResult[]> {
+export type RemoteHistory = {
+  accepted: boolean;
+  results: DailyResult[];
+};
+
+export type RemoteSaveResult = {
+  accepted: boolean;
+  result: DailyResult;
+};
+
+export async function fetchRemoteHistory(studentName: string): Promise<RemoteHistory> {
   const url = new URL("/api/results", window.location.origin);
   url.searchParams.set("studentName", studentName);
 
@@ -26,7 +38,10 @@ export async function fetchRemoteHistory(studentName: string): Promise<DailyResu
   }
 
   const payload = (await response.json()) as ResultsResponse;
-  return payload.results ?? [];
+  return {
+    accepted: payload.accepted !== false,
+    results: payload.results ?? []
+  };
 }
 
 export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
@@ -40,7 +55,7 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
   return payload.entries ?? [];
 }
 
-export async function saveRemoteDailyResult(result: DailyResult): Promise<DailyResult> {
+export async function saveRemoteDailyResult(result: DailyResult): Promise<RemoteSaveResult> {
   const response = await fetch("/api/results", {
     body: JSON.stringify(result),
     headers: {
@@ -59,5 +74,8 @@ export async function saveRemoteDailyResult(result: DailyResult): Promise<DailyR
     throw new Error("Remote save did not return a result.");
   }
 
-  return payload.result;
+  return {
+    accepted: payload.accepted !== false,
+    result: payload.result
+  };
 }
