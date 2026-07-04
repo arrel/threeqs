@@ -34,9 +34,9 @@ describe("daily problem selection", () => {
 
   it("uses explicitly scheduled problems without depending on array order", () => {
     const expandedProblems = [
-      makeProblem("new-future-easy", "easy", "2026-07-10"),
-      makeProblem("new-future-medium", "medium", "2026-07-10"),
-      makeProblem("new-future-stretch", "stretch", "2026-07-10"),
+      makeProblem("new-future-easy", "easy", "2026-09-01"),
+      makeProblem("new-future-medium", "medium", "2026-09-01"),
+      makeProblem("new-future-stretch", "stretch", "2026-09-01"),
       ...problems
     ];
 
@@ -50,20 +50,36 @@ describe("daily problem selection", () => {
   it("uses new explicitly scheduled problems on their assigned date", () => {
     const expandedProblems = [
       ...problems,
-      makeProblem("new-future-easy", "easy", "2026-07-10"),
-      makeProblem("new-future-medium", "medium", "2026-07-10"),
-      makeProblem("new-future-stretch", "stretch", "2026-07-10")
+      makeProblem("new-future-easy", "easy", "2026-09-01"),
+      makeProblem("new-future-medium", "medium", "2026-09-01"),
+      makeProblem("new-future-stretch", "stretch", "2026-09-01")
     ];
 
-    expect(selectDailyProblems(expandedProblems, "2026-07-10").map((problem) => problem.id)).toEqual([
+    expect(selectDailyProblems(expandedProblems, "2026-09-01").map((problem) => problem.id)).toEqual([
       "new-future-easy",
       "new-future-medium",
       "new-future-stretch"
     ]);
   });
 
+  it("has one scheduled problem per difficulty through August 19", () => {
+    for (const dateKey of getDateKeys("2026-07-04", "2026-08-19")) {
+      expect(selectDailyProblems(problems, dateKey).map((problem) => problem.difficulty)).toEqual([
+        "easy",
+        "medium",
+        "stretch"
+      ]);
+
+      expect(selectDailyProblems(problems, dateKey).map((problem) => problem.scheduledDate)).toEqual([
+        dateKey,
+        dateKey,
+        dateKey
+      ]);
+    }
+  });
+
   it("loops from the schedule start when a date has no assigned problems", () => {
-    expect(selectDailyProblems(problems, "2026-07-04").map((problem) => problem.id)).toEqual([
+    expect(selectDailyProblems(problems, "2026-08-20").map((problem) => problem.id)).toEqual([
       "easy-prime-factorization-90",
       "medium-gcf-bins",
       "stretch-exponent-simplify"
@@ -73,13 +89,13 @@ describe("daily problem selection", () => {
   it("does not let future scheduled problems perturb an unassigned date", () => {
     const expandedProblems = [
       ...problems,
-      makeProblem("new-future-easy", "easy", "2026-07-10"),
-      makeProblem("new-future-medium", "medium", "2026-07-10"),
-      makeProblem("new-future-stretch", "stretch", "2026-07-10")
+      makeProblem("new-future-easy", "easy", "2026-09-01"),
+      makeProblem("new-future-medium", "medium", "2026-09-01"),
+      makeProblem("new-future-stretch", "stretch", "2026-09-01")
     ];
 
-    expect(selectDailyProblems(expandedProblems, "2026-07-04").map((problem) => problem.id)).toEqual(
-      selectDailyProblems(problems, "2026-07-04").map((problem) => problem.id)
+    expect(selectDailyProblems(expandedProblems, "2026-08-20").map((problem) => problem.id)).toEqual(
+      selectDailyProblems(problems, "2026-08-20").map((problem) => problem.id)
     );
   });
 });
@@ -101,4 +117,19 @@ function makeProblem(id: string, difficulty: Difficulty, scheduledDate: string):
     source: { name: "Test source" },
     adapted: true
   };
+}
+
+function getDateKeys(startDateKey: string, endDateKey: string): string[] {
+  const [startYear, startMonth, startDay] = startDateKey.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endDateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+  const endTime = Date.UTC(endYear, endMonth - 1, endDay);
+  const result: string[] = [];
+
+  while (date.getTime() <= endTime) {
+    result.push(date.toISOString().slice(0, 10));
+    date.setUTCDate(date.getUTCDate() + 1);
+  }
+
+  return result;
 }
