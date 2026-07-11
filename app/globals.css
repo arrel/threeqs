@@ -741,6 +741,7 @@ button:disabled {
   height: 34px;
   place-items: center;
   flex-shrink: 0;
+  overflow: hidden;
   border-radius: 50%;
   background: var(--line);
   color: var(--muted);
