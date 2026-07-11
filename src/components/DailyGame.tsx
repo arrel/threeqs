@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Camera, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
 import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
 import { MathText } from "@/components/MathText";
@@ -33,6 +33,7 @@ import {
   getDailyDraft,
   getSavedStudentName,
   getSavedStudentPhoto,
+  getStudentKey,
   getStudentHistory,
   normalizeStudentName,
   replaceStudentHistory,
@@ -57,6 +58,12 @@ type DailyGameProps = {
 };
 
 type GameMode = "home" | "ready" | "quiz" | "review" | "score" | "streak";
+
+type PlayerProfileData = {
+  studentName: string;
+  photoDataUrl: string;
+  history: DailyResult[];
+};
 
 // Pop the "Are you still here?" prompt after three solid minutes of inactivity.
 const IDLE_PROMPT_AFTER_MS = 3 * 60 * 1000;
@@ -174,6 +181,30 @@ export function DailyGame({
       }
     },
     [activeStorage, isPhotoSaving, shouldUseRemoteResults, studentName]
+  );
+
+  const handleLoadPlayerProfile = useCallback(
+    async (profileName: string): Promise<PlayerProfileData> => {
+      if (!shouldUseRemoteResults) {
+        return {
+          studentName: normalizeStudentName(profileName),
+          photoDataUrl: "",
+          history: getStudentHistory(profileName, activeStorage)
+        };
+      }
+
+      const [profile, remoteHistory] = await Promise.all([
+        fetchRemoteProfile(profileName),
+        fetchRemoteHistory(profileName)
+      ]);
+
+      return {
+        studentName: profile.studentName,
+        photoDataUrl: profile.photoDataUrl,
+        history: remoteHistory.results
+      };
+    },
+    [activeStorage, shouldUseRemoteResults]
   );
 
   useEffect(() => {
@@ -1039,6 +1070,7 @@ export function DailyGame({
           nameInput={nameInput}
           onCancelSwitchPlayer={handleCancelSwitchPlayer}
           onNameChange={setNameInput}
+          onLoadProfile={handleLoadPlayerProfile}
           onPhotoChange={handleProfilePhotoChange}
           onSelectStreakDay={handleStreakDaySelect}
           onSwitchPlayer={handleSwitchPlayer}
@@ -1142,6 +1174,7 @@ type HomeScreenProps = {
   history: DailyResult[];
   nameInput: string;
   onCancelSwitchPlayer(): void;
+  onLoadProfile(studentName: string): Promise<PlayerProfileData>;
   onNameChange(name: string): void;
   onPhotoChange(event: ChangeEvent<HTMLInputElement>): void;
   onSelectStreakDay(dateKey: string): void;
@@ -1164,6 +1197,7 @@ function HomeScreen({
   history,
   nameInput,
   onCancelSwitchPlayer,
+  onLoadProfile,
   onNameChange,
   onPhotoChange,
   onSelectStreakDay,
@@ -1174,6 +1208,11 @@ function HomeScreen({
   photoError
 }: HomeScreenProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<PlayerProfileData | null>(null);
+  const [isSelectedProfileLoading, setIsSelectedProfileLoading] = useState(false);
+  const [selectedProfileError, setSelectedProfileError] = useState("");
+  const profileRequestRef = useRef(0);
   const nameLabelId = "student-name-label";
   const switchNameLabelId = "switch-player-name-label";
   const leaderboardPosition = getLeaderboardPosition(leaderboard, savedName);
@@ -1181,6 +1220,53 @@ function HomeScreen({
   const primaryActionLabel = savedName ? `Continue as ${savedName}` : "Play";
   const isPrimaryActionDisabled = isStarting || (!savedName && !normalizeStudentName(nameInput));
   const switchTargetName = normalizeStudentName(nameInput);
+
+  const openPlayerProfile = useCallback(
+    (entry: Pick<LeaderboardEntry, "studentName" | "photoDataUrl">) => {
+      const requestId = profileRequestRef.current + 1;
+      profileRequestRef.current = requestId;
+      const isCurrentPlayer = getStudentKey(entry.studentName) === getStudentKey(savedName);
+
+      setSelectedProfile({
+        studentName: entry.studentName,
+        photoDataUrl: isCurrentPlayer ? photoDataUrl : entry.photoDataUrl ?? "",
+        history: isCurrentPlayer ? history : []
+      });
+      setSelectedProfileError("");
+      setIsSelectedProfileLoading(!isCurrentPlayer);
+      setIsProfileOpen(true);
+
+      if (isCurrentPlayer) {
+        return;
+      }
+
+      onLoadProfile(entry.studentName)
+        .then((profile) => {
+          if (profileRequestRef.current === requestId) {
+            setSelectedProfile((current) => ({
+              ...profile,
+              photoDataUrl: profile.photoDataUrl || current?.photoDataUrl || ""
+            }));
+          }
+        })
+        .catch(() => {
+          if (profileRequestRef.current === requestId) {
+            setSelectedProfileError("This player’s full history couldn’t be loaded.");
+          }
+        })
+        .then(() => {
+          if (profileRequestRef.current === requestId) {
+            setIsSelectedProfileLoading(false);
+          }
+        });
+    },
+    [history, onLoadProfile, photoDataUrl, savedName]
+  );
+
+  const closePlayerProfile = useCallback(() => {
+    profileRequestRef.current += 1;
+    setIsProfileOpen(false);
+  }, []);
 
   return (
     <section className="app-card home-card" aria-label="Three Qs home">
@@ -1236,37 +1322,20 @@ function HomeScreen({
                 <span aria-hidden="true" className="name-skeleton-bar" />
               </div>
             ) : savedName ? (
-              <>
               <div aria-labelledby={nameLabelId} className="name-display">
-                <label
-                  aria-label={`${photoDataUrl ? "Change" : "Add"} profile photo for ${savedName}`}
-                  className={["name-avatar", "name-avatar-editable", isPhotoSaving ? "saving" : ""]
-                    .filter(Boolean)
-                    .join(" ")}
+                <button
+                  aria-label={`Open profile for ${savedName}`}
+                  className="name-profile-button"
+                  onClick={() => openPlayerProfile({ studentName: savedName, photoDataUrl })}
+                  type="button"
                 >
-                  {photoDataUrl ? (
-                    <img alt="" src={photoDataUrl} />
-                  ) : (
-                    <UserRound aria-hidden="true" size={19} />
-                  )}
-                  <span className="name-avatar-camera" aria-hidden="true">
-                    <Camera size={10} />
-                  </span>
-                  <input
-                    accept="image/jpeg,image/png,image/webp"
-                    className="visually-hidden"
-                    disabled={isPhotoSaving}
-                    onChange={onPhotoChange}
-                    type="file"
-                  />
-                </label>
-                <span className="name-display-text">{savedName}</span>
+                  <PlayerAvatar className="name-avatar" name={savedName} photoDataUrl={photoDataUrl} />
+                  <span className="name-display-text">{savedName}</span>
+                </button>
                 <button className="name-switch-btn" onClick={onSwitchPlayer} type="button">
                   Switch
                 </button>
               </div>
-              {photoError ? <p className="profile-photo-error" role="alert">{photoError}</p> : null}
-              </>
             ) : (
               <input
                 aria-labelledby={nameLabelId}
@@ -1345,8 +1414,28 @@ function HomeScreen({
         title="Leaderboard"
         titleId="leaderboard-sheet-title"
       >
-        <Leaderboard entries={leaderboard} isLoading={isLeaderboardLoading} variant="sheet" />
+        <Leaderboard
+          entries={leaderboard}
+          isLoading={isLeaderboardLoading}
+          onSelectProfile={openPlayerProfile}
+          variant="sheet"
+        />
       </BottomSheet>
+
+      <PlayerProfileSheet
+        currentPhotoDataUrl={photoDataUrl}
+        currentPlayerName={savedName}
+        dateKey={dateKey}
+        error={selectedProfileError}
+        isLoading={isSelectedProfileLoading}
+        isPhotoSaving={isPhotoSaving}
+        onClosed={() => setSelectedProfile(null)}
+        onDismiss={closePlayerProfile}
+        onPhotoChange={onPhotoChange}
+        open={isProfileOpen}
+        photoError={photoError}
+        profile={selectedProfile}
+      />
     </section>
   );
 }
@@ -1354,10 +1443,12 @@ function HomeScreen({
 function Leaderboard({
   entries,
   isLoading,
+  onSelectProfile,
   variant = "inline"
 }: {
   entries: LeaderboardEntry[];
   isLoading: boolean;
+  onSelectProfile(entry: LeaderboardEntry): void;
   variant?: "inline" | "sheet";
 }) {
   const display = entries;
@@ -1383,7 +1474,19 @@ function Leaderboard({
             {display.map((entry, index) => (
               <li className="leaderboard-row" key={entry.studentName}>
                 <span className="leaderboard-rank">{index + 1}</span>
-                <span className="leaderboard-name">{entry.studentName}</span>
+                <button
+                  aria-label={`Open profile for ${entry.studentName}`}
+                  className="leaderboard-player-button"
+                  onClick={() => onSelectProfile(entry)}
+                  type="button"
+                >
+                  <PlayerAvatar
+                    className="leaderboard-avatar"
+                    name={entry.studentName}
+                    photoDataUrl={entry.photoDataUrl ?? ""}
+                  />
+                  <span className="leaderboard-name">{entry.studentName}</span>
+                </button>
                 <span className="leaderboard-medals">
                   {entry.gold > 0 && (
                     <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>
@@ -1417,6 +1520,197 @@ function Leaderboard({
       </div>
     </div>
   );
+}
+
+function PlayerAvatar({
+  className,
+  name,
+  photoDataUrl
+}: {
+  className: string;
+  name: string;
+  photoDataUrl: string;
+}) {
+  return (
+    <span aria-hidden="true" className={className}>
+      {photoDataUrl ? <img alt="" src={photoDataUrl} /> : <span>{getPlayerInitials(name)}</span>}
+    </span>
+  );
+}
+
+function PlayerProfileSheet({
+  currentPhotoDataUrl,
+  currentPlayerName,
+  dateKey,
+  error,
+  isLoading,
+  isPhotoSaving,
+  onClosed,
+  onDismiss,
+  onPhotoChange,
+  open,
+  photoError,
+  profile
+}: {
+  currentPhotoDataUrl: string;
+  currentPlayerName: string;
+  dateKey: string;
+  error: string;
+  isLoading: boolean;
+  isPhotoSaving: boolean;
+  onClosed(): void;
+  onDismiss(): void;
+  onPhotoChange(event: ChangeEvent<HTMLInputElement>): void;
+  open: boolean;
+  photoError: string;
+  profile: PlayerProfileData | null;
+}) {
+  if (!profile) {
+    return null;
+  }
+
+  const isCurrentPlayer = getStudentKey(profile.studentName) === getStudentKey(currentPlayerName);
+  const photoDataUrl = isCurrentPlayer ? currentPhotoDataUrl : profile.photoDataUrl;
+  const recentHistory = [...profile.history]
+    .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+    .slice(0, 7);
+  const lifetimePoints = profile.history.reduce((total, result) => total + result.totalScore, 0);
+  const currentStreak = calculateCurrentStreak(profile.history, dateKey);
+  const medalCounts = {
+    gold: profile.history.filter((result) => result.medal === "gold").length,
+    silver: profile.history.filter((result) => result.medal === "silver").length,
+    bronze: profile.history.filter((result) => result.medal === "bronze").length,
+    practice: profile.history.filter((result) => result.medal === "practice").length
+  };
+
+  const avatar = isCurrentPlayer && !photoDataUrl ? (
+    <span aria-hidden="true" className="profile-avatar-photo profile-avatar-empty">
+      <UserRound size={30} />
+      <span>Add photo</span>
+    </span>
+  ) : (
+    <PlayerAvatar
+      className="profile-avatar-photo"
+      name={profile.studentName}
+      photoDataUrl={photoDataUrl}
+    />
+  );
+
+  return (
+    <BottomSheet
+      backdropTestId="player-profile-backdrop"
+      className="player-profile-sheet"
+      closeLabel={`Close profile for ${profile.studentName}`}
+      onClosed={onClosed}
+      onDismiss={onDismiss}
+      open={open}
+      testId="player-profile-sheet"
+      title={`${profile.studentName} profile`}
+      titleId="player-profile-sheet-title"
+    >
+      <div className="player-profile-content">
+        {isCurrentPlayer ? (
+          <label
+            aria-label={`${photoDataUrl ? "Change" : "Add"} profile photo for ${profile.studentName}`}
+            className={["profile-avatar-sticker", "editable", isPhotoSaving ? "saving" : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {avatar}
+            <span aria-hidden="true" className="profile-avatar-edit-overlay">
+              <Pencil size={22} />
+            </span>
+            <input
+              accept="image/jpeg,image/png,image/webp"
+              className="visually-hidden"
+              disabled={isPhotoSaving}
+              onChange={onPhotoChange}
+              type="file"
+            />
+          </label>
+        ) : (
+          <div className="profile-avatar-sticker">{avatar}</div>
+        )}
+
+        <div className="player-profile-heading">
+          <h3>{profile.studentName}</h3>
+          <p>{isCurrentPlayer ? "Your player profile" : "Player profile"}</p>
+        </div>
+
+        {photoError && isCurrentPlayer ? (
+          <p className="profile-photo-error profile-sheet-error" role="alert">
+            {photoError}
+          </p>
+        ) : null}
+
+        {isLoading ? (
+          <div aria-label="Profile loading" className="player-profile-loading" role="status">
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : (
+          <>
+            {error ? <p className="player-profile-load-error">{error}</p> : null}
+            <section aria-label="Lifetime stats" className="profile-section">
+              <p className="profile-section-title">Lifetime stats</p>
+              <div className="profile-primary-stats">
+                <span><strong>{lifetimePoints.toLocaleString()}</strong><small>points</small></span>
+                <span><strong>{profile.history.length}</strong><small>days</small></span>
+                <span><strong>{currentStreak}</strong><small>day streak</small></span>
+              </div>
+              <div className="profile-medal-stats">
+                {(Object.keys(medalCounts) as MedalResult[]).map((medal) => (
+                  <span className={`profile-medal-stat ${medal}`} key={medal}>
+                    <strong>{medalCounts[medal]}</strong>
+                    <small>{getMedalLabel(medal)}</small>
+                  </span>
+                ))}
+              </div>
+            </section>
+
+            <section aria-label="Recent history" className="profile-section recent-history-section">
+              <p className="profile-section-title">Recent history</p>
+              {recentHistory.length > 0 ? (
+                <ol className="profile-history-list">
+                  {recentHistory.map((result) => (
+                    <li key={result.dateKey}>
+                      <span aria-hidden="true" className={`profile-history-medal ${result.medal}`}>
+                        {getStreakSpotLabel(result.medal)}
+                      </span>
+                      <span className="profile-history-date">{formatProfileHistoryDate(result.dateKey)}</span>
+                      <span className="profile-history-score">{result.totalScore}<small> pts</small></span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="profile-history-empty">No completed days yet.</p>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
+function getPlayerInitials(name: string): string {
+  return normalizeStudentName(name)
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase() ?? "")
+    .join("") || "?";
+}
+
+function formatProfileHistoryDate(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+    timeZone: "UTC"
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
 type HomeStreakDay = {
