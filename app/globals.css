@@ -547,6 +547,7 @@ button:disabled {
 
 .leaderboard-avatar img,
 .name-avatar img,
+.switch-player-current-icon img,
 .profile-avatar-photo img {
   width: 100%;
   height: 100%;
@@ -842,6 +843,7 @@ button:disabled {
   height: 38px;
   place-items: center;
   flex: 0 0 auto;
+  overflow: hidden;
   border-radius: 50%;
   background: var(--paper);
   color: var(--muted);
