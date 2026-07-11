@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { RoutedDailyGame } from "@/components/RoutedDailyGame";
 import "./globals.css";
 
@@ -131,7 +132,9 @@ export default function RootLayout({
           </defs>
           <rect width="100%" height="100%" fill="url(#qthrees)" />
         </svg>
-        <RoutedDailyGame />
+        <Suspense fallback={null}>
+          <RoutedDailyGame />
+        </Suspense>
         {children}
       </body>
     </html>

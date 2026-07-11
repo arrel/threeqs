@@ -25,6 +25,44 @@ export type RemoteSaveResult = {
   result: DailyResult;
 };
 
+export type RemoteProfile = {
+  photoDataUrl: string;
+  studentName: string;
+};
+
+export async function fetchRemoteProfile(studentName: string): Promise<RemoteProfile> {
+  const url = new URL("/api/profile", window.location.origin);
+  url.searchParams.set("studentName", studentName);
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Could not load remote profile: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as Partial<RemoteProfile>;
+  return {
+    photoDataUrl: typeof payload.photoDataUrl === "string" ? payload.photoDataUrl : "",
+    studentName: payload.studentName ?? studentName
+  };
+}
+
+export async function saveRemoteProfilePhoto(
+  studentName: string,
+  photoDataUrl: string
+): Promise<RemoteProfile> {
+  const response = await fetch("/api/profile", {
+    body: JSON.stringify({ photoDataUrl, studentName }),
+    headers: { "Content-Type": "application/json" },
+    method: "PUT"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Could not save remote profile: ${response.status}`);
+  }
+
+  return (await response.json()) as RemoteProfile;
+}
+
 export async function fetchRemoteHistory(studentName: string): Promise<RemoteHistory> {
   const url = new URL("/api/results", window.location.origin);
   url.searchParams.set("studentName", studentName);

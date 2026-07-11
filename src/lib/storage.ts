@@ -19,8 +19,9 @@ type StoredPayload = {
 };
 
 type StoredProfile = {
-  version: 1;
+  version: 1 | 2;
   studentName: string;
+  photoDataUrl?: string;
 };
 
 type StoredLeaderboard = {
@@ -44,6 +45,11 @@ type StoredDailyDraft = Omit<DailyDraft, "questionResults"> & {
   version: 1;
   questionResults: Record<string, QuestionResult>;
   updatedAt: string;
+};
+
+type StoredDailyDraftCollection = {
+  version: 2;
+  drafts: Record<string, StoredDailyDraft>;
 };
 
 function emptyPayload(): StoredPayload {
@@ -110,11 +116,31 @@ export function getSavedStudentName(storage = getBrowserStorage()): string {
 
   try {
     const parsed = JSON.parse(raw) as StoredProfile;
-    if (parsed.version !== 1) {
+    if (parsed.version !== 1 && parsed.version !== 2) {
       return "";
     }
 
     return normalizeStudentName(parsed.studentName);
+  } catch {
+    return "";
+  }
+}
+
+export function getSavedStudentPhoto(storage = getBrowserStorage()): string {
+  if (!storage) {
+    return "";
+  }
+
+  const raw = storage.getItem(PROFILE_KEY);
+  if (!raw) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as StoredProfile;
+    return parsed.version === 2 && typeof parsed.photoDataUrl === "string"
+      ? parsed.photoDataUrl
+      : "";
   } catch {
     return "";
   }
@@ -130,11 +156,40 @@ export function saveStudentName(name: string, storage = getBrowserStorage()): vo
     return;
   }
 
+  const savedName = getSavedStudentName(storage);
+  const savedPhoto =
+    getStudentKey(savedName) === getStudentKey(studentName) ? getSavedStudentPhoto(storage) : "";
+
   storage.setItem(
     PROFILE_KEY,
     JSON.stringify({
-      version: 1,
-      studentName
+      version: 2,
+      studentName,
+      ...(savedPhoto ? { photoDataUrl: savedPhoto } : {})
+    } satisfies StoredProfile)
+  );
+}
+
+export function saveStudentPhoto(
+  name: string,
+  photoDataUrl: string,
+  storage = getBrowserStorage()
+): void {
+  if (!storage) {
+    return;
+  }
+
+  const studentName = normalizeStudentName(name);
+  if (!studentName || getStudentKey(getSavedStudentName(storage)) !== getStudentKey(studentName)) {
+    return;
+  }
+
+  storage.setItem(
+    PROFILE_KEY,
+    JSON.stringify({
+      version: 2,
+      studentName,
+      photoDataUrl
     } satisfies StoredProfile)
   );
 }
@@ -244,9 +299,13 @@ export function getDailyDraft(
   }
 
   try {
-    const parsed = JSON.parse(raw) as StoredDailyDraft;
+    const payload = JSON.parse(raw) as StoredDailyDraft | StoredDailyDraftCollection;
+    const parsed = payload.version === 2
+      ? payload.drafts[getDraftKey(name, dateKey)]
+      : payload;
 
     if (
+      !parsed ||
       parsed.version !== 1 ||
       parsed.dateKey !== dateKey ||
       getStudentKey(parsed.studentName) !== getStudentKey(name)
@@ -285,9 +344,7 @@ export function saveDailyDraft(draft: DailyDraft, storage = getBrowserStorage())
     return;
   }
 
-  storage.setItem(
-    DRAFT_KEY,
-    JSON.stringify({
+  const storedDraft = {
       version: 1,
       dateKey: draft.dateKey,
       studentName,
@@ -302,8 +359,10 @@ export function saveDailyDraft(draft: DailyDraft, storage = getBrowserStorage())
           ? draft.questionElapsedMs
           : 0,
       updatedAt: new Date().toISOString()
-    } satisfies StoredDailyDraft)
-  );
+    } satisfies StoredDailyDraft;
+  const collection = readDraftCollection(storage);
+  collection.drafts[getDraftKey(studentName, draft.dateKey)] = storedDraft;
+  storage.setItem(DRAFT_KEY, JSON.stringify(collection));
 }
 
 export function clearDailyDraft(
@@ -315,12 +374,49 @@ export function clearDailyDraft(
     return;
   }
 
-  if (storage.removeItem) {
-    storage.removeItem(DRAFT_KEY);
+  const collection = readDraftCollection(storage);
+  delete collection.drafts[getDraftKey(name, dateKey)];
+
+  if (Object.keys(collection.drafts).length > 0) {
+    storage.setItem(DRAFT_KEY, JSON.stringify(collection));
     return;
   }
 
-  storage.setItem(DRAFT_KEY, "");
+  if (storage.removeItem) {
+    storage.removeItem(DRAFT_KEY);
+  } else {
+    storage.setItem(DRAFT_KEY, "");
+  }
+}
+
+function getDraftKey(name: string, dateKey: string): string {
+  return `${getStudentKey(name)}:${dateKey}`;
+}
+
+function readDraftCollection(storage: StorageLike): StoredDailyDraftCollection {
+  const empty: StoredDailyDraftCollection = { version: 2, drafts: {} };
+  const raw = storage.getItem(DRAFT_KEY);
+  if (!raw) {
+    return empty;
+  }
+
+  try {
+    const payload = JSON.parse(raw) as StoredDailyDraft | StoredDailyDraftCollection;
+    if (payload.version === 2 && payload.drafts && typeof payload.drafts === "object") {
+      return payload;
+    }
+
+    if (payload.version === 1 && payload.studentName && payload.dateKey) {
+      return {
+        version: 2,
+        drafts: { [getDraftKey(payload.studentName, payload.dateKey)]: payload }
+      };
+    }
+  } catch {
+    return empty;
+  }
+
+  return empty;
 }
 
 export function getStudentHistory(name: string, storage = getBrowserStorage()): DailyResult[] {

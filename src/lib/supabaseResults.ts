@@ -11,6 +11,12 @@ type StudentRow = {
   id: string;
   name: string;
   name_key: string;
+  photo_data_url: string | null;
+};
+
+export type StudentProfile = {
+  studentName: string;
+  photoDataUrl: string;
 };
 
 type DailyResultRow = {
@@ -49,6 +55,39 @@ export class SupabaseNotConfiguredError extends Error {
     super("Supabase is not configured.");
     this.name = "SupabaseNotConfiguredError";
   }
+}
+
+export async function loadSupabaseStudentProfile(studentName: string): Promise<StudentProfile> {
+  const normalizedName = normalizeStudentName(studentName);
+  const student = await findStudent(normalizedName);
+
+  return {
+    studentName: student?.name ?? normalizedName,
+    photoDataUrl: student?.photo_data_url ?? ""
+  };
+}
+
+export async function saveSupabaseStudentPhoto(
+  studentName: string,
+  photoDataUrl: string
+): Promise<StudentProfile> {
+  const student = await getOrCreateStudent(studentName);
+  const rows = await supabaseRest<StudentRow[]>(
+    "students",
+    { id: `eq.${student.id}` },
+    {
+      body: JSON.stringify({ photo_data_url: photoDataUrl, updated_at: new Date().toISOString() }),
+      headers: { Prefer: "return=representation" },
+      method: "PATCH"
+    }
+  );
+  const saved = rows[0];
+
+  if (!saved) {
+    throw new Error("Supabase did not return the updated student profile.");
+  }
+
+  return { studentName: saved.name, photoDataUrl: saved.photo_data_url ?? "" };
 }
 
 export async function loadSupabaseHistory(studentName: string): Promise<DailyResult[]> {
@@ -246,7 +285,8 @@ async function getOrCreateStudent(studentName: string): Promise<StudentRow> {
       {
         body: JSON.stringify({
           name: normalizedName,
-          name_key: nameKey
+          name_key: nameKey,
+          photo_data_url: null
         }),
         headers: {
           Prefer: "return=representation"

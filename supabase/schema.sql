@@ -8,6 +8,9 @@ create table if not exists public.students (
   updated_at timestamptz not null default now()
 );
 
+alter table public.students
+  add column if not exists photo_data_url text;
+
 create table if not exists public.daily_results (
   id uuid primary key default gen_random_uuid(),
   student_id uuid not null references public.students(id) on delete cascade,
@@ -57,6 +60,8 @@ comment on column public.students.name is
   'Display name typed by the student.';
 comment on column public.students.name_key is
   'Lowercase normalized unique key for name-only login.';
+comment on column public.students.photo_data_url is
+  'Small client-resized profile image data URL. Intentionally editable by anyone who knows the student name.';
 
 comment on table public.daily_results is
   'Completed Three Qs daily results, one row per student and Pacific date.';
@@ -81,10 +86,10 @@ alter table public.daily_results enable row level security;
 alter table public.question_results enable row level security;
 
 grant usage on schema public to anon, authenticated;
-grant select, insert on public.students to anon, authenticated;
+grant select, insert, update on public.students to anon, authenticated;
 grant select, insert on public.daily_results to anon, authenticated;
 grant select, insert on public.question_results to anon, authenticated;
-revoke update, delete on public.students from anon, authenticated;
+revoke delete on public.students from anon, authenticated;
 revoke update, delete on public.daily_results from anon, authenticated;
 revoke update, delete on public.question_results from anon, authenticated;
 
@@ -102,6 +107,15 @@ create policy "Enable insert for all users"
   as permissive
   for insert
   to public
+  with check (true);
+
+drop policy if exists "Enable profile updates for all users" on public.students;
+create policy "Enable profile updates for all users"
+  on public.students
+  as permissive
+  for update
+  to public
+  using (true)
   with check (true);
 
 drop policy if exists "Enable read access for all users" on public.daily_results;
