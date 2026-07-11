@@ -457,6 +457,7 @@ button:disabled {
   border-radius: 18px;
   background: #fbf6eb;
   box-shadow: 0 3px 10px rgba(var(--ink-rgb), 0.045);
+  transition: background-color 160ms ease, border-color 160ms ease;
 }
 
 .leaderboard-row:first-child {
@@ -510,11 +511,16 @@ button:disabled {
   gap: 5px;
 }
 
-.leaderboard-player-button:hover .leaderboard-name,
-.leaderboard-player-button:focus-visible .leaderboard-name {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
+.leaderboard-row:has(.leaderboard-player-button:hover),
+.leaderboard-row:has(.leaderboard-player-button:focus-visible) {
+  border-color: #d8b77e;
+  background: #f5ead5;
+}
+
+.leaderboard-row:first-child:has(.leaderboard-player-button:hover),
+.leaderboard-row:first-child:has(.leaderboard-player-button:focus-visible) {
+  border-color: #d89a19;
+  background: linear-gradient(135deg, #ffd267, #f6bd35);
 }
 
 .leaderboard-player-button:focus-visible {
@@ -692,6 +698,10 @@ button:disabled {
   font-weight: 500;
 }
 
+.name-display {
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
 .name-display,
 .name-loading {
   display: flex;
@@ -712,11 +722,10 @@ button:disabled {
   text-align: left;
 }
 
-.name-profile-button:hover .name-display-text,
-.name-profile-button:focus-visible .name-display-text {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
+.name-display:has(.name-profile-button:hover),
+.name-display:has(.name-profile-button:focus-visible) {
+  border-color: #d5ad68;
+  background: #f7ecd8;
 }
 
 .name-profile-button:focus-visible {
