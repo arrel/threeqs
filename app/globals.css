@@ -699,6 +699,7 @@ button:disabled {
 }
 
 .name-display {
+  border-radius: 18px;
   transition: background-color 160ms ease, border-color 160ms ease;
 }
 
@@ -729,7 +730,7 @@ button:disabled {
 }
 
 .name-profile-button:focus-visible {
-  border-radius: 999px;
+  border-radius: 10px;
   outline: 3px solid rgba(245, 173, 39, 0.28);
   outline-offset: 4px;
 }
