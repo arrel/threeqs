@@ -94,7 +94,14 @@ describe("local result storage", () => {
 
     saveCachedLeaderboard(
       [
-        { studentName: "Bob", totalPoints: 100, gold: 1, silver: 0, bronze: 0 },
+        {
+          studentName: "Bob",
+          photoDataUrl: "data:image/jpeg;base64,Ym9i",
+          totalPoints: 100,
+          gold: 1,
+          silver: 0,
+          bronze: 0
+        },
         { studentName: "bob", totalPoints: 80, gold: 0, silver: 1, bronze: 0 },
         { studentName: "Ada", totalPoints: 90, gold: 0, silver: 0, bronze: 1 }
       ],
@@ -102,7 +109,14 @@ describe("local result storage", () => {
     );
 
     expect(getCachedLeaderboard(storage)).toEqual([
-      { studentName: "Bob", totalPoints: 180, gold: 1, silver: 1, bronze: 0 },
+      {
+        studentName: "Bob",
+        photoDataUrl: "data:image/jpeg;base64,Ym9i",
+        totalPoints: 180,
+        gold: 1,
+        silver: 1,
+        bronze: 0
+      },
       { studentName: "Ada", totalPoints: 90, gold: 0, silver: 0, bronze: 1 }
     ]);
   });
