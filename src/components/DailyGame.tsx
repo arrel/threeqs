@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
-import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Camera, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
+import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
@@ -11,7 +11,9 @@ import type { GameRoute, RouteNavigation } from "@/lib/gameRoutes";
 import {
   fetchLeaderboard,
   fetchRemoteHistory,
+  fetchRemoteProfile,
   saveRemoteDailyResult,
+  saveRemoteProfilePhoto,
   type RemoteHistory
 } from "@/lib/remoteResults";
 import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
@@ -30,6 +32,7 @@ import {
   getCachedLeaderboard,
   getDailyDraft,
   getSavedStudentName,
+  getSavedStudentPhoto,
   getStudentHistory,
   normalizeStudentName,
   replaceStudentHistory,
@@ -37,6 +40,7 @@ import {
   saveDailyDraft,
   saveDailyResult,
   saveStudentName,
+  saveStudentPhoto,
   type DailyDraft,
   type StorageLike
 } from "@/lib/storage";
@@ -72,7 +76,8 @@ export function DailyGame({
   storage,
   idlePromptAfterMs = IDLE_PROMPT_AFTER_MS
 }: DailyGameProps) {
-  const dateKey = useMemo(() => getPacificDateKey(today), [today]);
+  const todayDateKey = useMemo(() => getPacificDateKey(today), [today]);
+  const [dateKey, setDateKey] = useState(todayDateKey);
   const dailyProblems = useMemo(() => selectDailyProblems(problems, dateKey), [dateKey]);
   const activeStorage = storage;
   const shouldUseRemoteResults = storage === undefined;
@@ -81,6 +86,9 @@ export function DailyGame({
   const [mode, setMode] = useState<GameMode>("home");
   const [nameInput, setNameInput] = useState("");
   const [studentName, setStudentName] = useState("");
+  const [profilePhoto, setProfilePhoto] = useState("");
+  const [isPhotoSaving, setIsPhotoSaving] = useState(false);
+  const [photoError, setPhotoError] = useState("");
   const [history, setHistory] = useState<DailyResult[]>([]);
   const [homeHistory, setHomeHistory] = useState<DailyResult[]>([]);
   const [currentResult, setCurrentResult] = useState<DailyResult | null>(null);
@@ -103,14 +111,18 @@ export function DailyGame({
   const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
 
   const trimmedInput = normalizeStudentName(nameInput);
-  const streak = calculateCurrentStreak(history, dateKey);
+  const streak = calculateCurrentStreak(history, todayDateKey);
   const currentProblem = dailyProblems[currentIndex];
 
   const navigateTo = useCallback(
-    (nextRoute: GameRoute, navigation: RouteNavigation = "push") => {
-      onRouteChange?.(nextRoute, navigation);
+    (nextRoute: GameRoute, navigation: RouteNavigation = "push", targetDateKey = dateKey) => {
+      const datedRoute =
+        nextRoute.screen === "home" || nextRoute.screen === "invalid"
+          ? nextRoute
+          : { ...nextRoute, dateKey: targetDateKey };
+      onRouteChange?.(datedRoute, navigation);
     },
-    [onRouteChange]
+    [dateKey, onRouteChange]
   );
 
   // Keep a ref alongside the timer state so effect cleanups and event handlers
@@ -136,6 +148,34 @@ export function DailyGame({
     setNameInput("");
   }, []);
 
+  const handleProfilePhotoChange = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file || !studentName || isPhotoSaving) {
+        return;
+      }
+
+      setIsPhotoSaving(true);
+      setPhotoError("");
+
+      try {
+        const photoDataUrl = await resizeProfilePhoto(file);
+        const savedProfile = shouldUseRemoteResults
+          ? await saveRemoteProfilePhoto(studentName, photoDataUrl)
+          : { studentName, photoDataUrl };
+
+        setProfilePhoto(savedProfile.photoDataUrl);
+        saveStudentPhoto(studentName, savedProfile.photoDataUrl, activeStorage);
+      } catch {
+        setPhotoError("That photo couldn’t be saved. Try a different image.");
+      } finally {
+        setIsPhotoSaving(false);
+      }
+    },
+    [activeStorage, isPhotoSaving, shouldUseRemoteResults, studentName]
+  );
+
   useEffect(() => {
     setHasLoadedProfile(false);
     const savedName = getSavedStudentName(activeStorage);
@@ -143,6 +183,7 @@ export function DailyGame({
     if (!savedName) {
       setNameInput("");
       setStudentName("");
+      setProfilePhoto("");
       setHistory([]);
       setHomeHistory([]);
       setIsProfileLoading(false);
@@ -153,6 +194,7 @@ export function DailyGame({
 
     setNameInput("");
     setStudentName(savedName);
+    setProfilePhoto(getSavedStudentPhoto(activeStorage));
     const savedHistory = getStudentHistory(savedName, activeStorage);
     setHistory(savedHistory);
     setHomeHistory(savedHistory);
@@ -164,6 +206,28 @@ export function DailyGame({
     setIsProfileLoading(false);
     setHasLoadedProfile(true);
   }, [activeStorage, shouldUseRemoteResults]);
+
+  useEffect(() => {
+    if (!studentName || !shouldUseRemoteResults) {
+      return undefined;
+    }
+
+    let isCanceled = false;
+    fetchRemoteProfile(studentName)
+      .then((profile) => {
+        if (isCanceled) {
+          return;
+        }
+
+        setProfilePhoto(profile.photoDataUrl);
+        saveStudentPhoto(studentName, profile.photoDataUrl, activeStorage);
+      })
+      .catch(() => {});
+
+    return () => {
+      isCanceled = true;
+    };
+  }, [activeStorage, shouldUseRemoteResults, studentName]);
 
   useEffect(() => {
     if (mode !== "home" || isStarting) {
@@ -262,7 +326,25 @@ export function DailyGame({
     }
 
     if (route.screen === "home") {
+      setDateKey(todayDateKey);
       setMode("home");
+      return;
+    }
+
+    if (route.screen === "invalid") {
+      forceHome();
+      return;
+    }
+
+    const routeDateKey = route.dateKey ?? todayDateKey;
+    const earliestAllowedDateKey = addDaysToDateKey(todayDateKey, -6);
+    if (routeDateKey < earliestAllowedDateKey || routeDateKey > todayDateKey) {
+      forceHome();
+      return;
+    }
+
+    if (routeDateKey !== dateKey) {
+      setDateKey(routeDateKey);
       return;
     }
 
@@ -279,11 +361,6 @@ export function DailyGame({
     setStudentName(savedName);
     setHistory(savedHistory);
     setHomeHistory(savedHistory);
-
-    if (route.screen === "invalid") {
-      forceHome();
-      return;
-    }
 
     if (existingResult) {
       restoreCompletedRoute(existingResult, route);
@@ -331,7 +408,7 @@ export function DailyGame({
     }
 
     restoreQuestionRoute(draft, route.questionIndex);
-  }, [activeStorage, dateKey, hasLoadedProfile, isRoutingEnabled, navigateTo, route]);
+  }, [activeStorage, dateKey, hasLoadedProfile, isRoutingEnabled, navigateTo, route, todayDateKey]);
 
   useEffect(() => {
     if (mode !== "quiz" || !studentName) {
@@ -400,6 +477,7 @@ export function DailyGame({
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
     setIsCurrentQuestionFinalized(false);
+    setDateKey(todayDateKey);
     setMode("home");
     navigateTo({ screen: "home" }, "replace");
   }
@@ -434,9 +512,14 @@ export function DailyGame({
     forceHome();
   }
 
-  function restoreDraftResultsRoute(savedName: string, draft: DailyDraft | null) {
+  function restoreDraftResultsRoute(
+    savedName: string,
+    draft: DailyDraft | null,
+    targetDateKey = dateKey,
+    targetProblems = dailyProblems
+  ) {
     const completeResults = draft
-      ? getCompleteQuestionResults(draft.questionResults, dailyProblems.length)
+      ? getCompleteQuestionResults(draft.questionResults, targetProblems.length)
       : null;
 
     if (!completeResults) {
@@ -446,13 +529,13 @@ export function DailyGame({
 
     setCurrentResult(
       buildDailyResult({
-        dateKey,
+        dateKey: targetDateKey,
         studentName: savedName,
         questionResults: completeResults
       })
     );
     setQuestionResults(completeResults);
-    setCurrentIndex(dailyProblems.length - 1);
+    setCurrentIndex(targetProblems.length - 1);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
     setCheckedResult(null);
@@ -461,8 +544,12 @@ export function DailyGame({
     setMode("score");
   }
 
-  function restoreQuestionRoute(draft: DailyDraft | null, questionIndex: number) {
-    if (questionIndex < 0 || questionIndex >= dailyProblems.length) {
+  function restoreQuestionRoute(
+    draft: DailyDraft | null,
+    questionIndex: number,
+    targetProblems = dailyProblems
+  ) {
+    if (questionIndex < 0 || questionIndex >= targetProblems.length) {
       forceHome();
       return;
     }
@@ -487,7 +574,7 @@ export function DailyGame({
 
     const firstIncompleteQuestionIndex = getFirstIncompleteQuestionIndex(
       draft.questionResults,
-      dailyProblems.length
+      targetProblems.length
     );
 
     if (questionIndex > firstIncompleteQuestionIndex) {
@@ -495,7 +582,7 @@ export function DailyGame({
       return;
     }
 
-    const draftCurrentIndex = clampQuestionIndex(draft.currentIndex, dailyProblems.length);
+    const draftCurrentIndex = clampQuestionIndex(draft.currentIndex, targetProblems.length);
     const shouldRestoreActiveQuestion =
       draftCurrentIndex === questionIndex && !getQuestionResultAt(draft.questionResults, questionIndex);
 
@@ -543,7 +630,12 @@ export function DailyGame({
       return;
     }
 
-    setStudentName(nextStudentName);
+    const isSameStudent = normalizeStudentName(studentName).toLocaleLowerCase() ===
+      normalizeStudentName(nextStudentName).toLocaleLowerCase();
+    if (!isSameStudent) {
+      setProfilePhoto("");
+    }
+    setPhotoError("");
     setNameInput("");
     setIsSwitchingPlayer(false);
     setIsStarting(true);
@@ -559,6 +651,7 @@ export function DailyGame({
       } else {
         clearSavedStudentName(nextStudentName, activeStorage);
       }
+      setStudentName(nextStudentName);
 
       const existingResult = nextHistory.find((result) => result.dateKey === dateKey);
       setHistory(nextHistory);
@@ -621,6 +714,61 @@ export function DailyGame({
     } finally {
       setIsStarting(false);
     }
+  }
+
+  function handleStreakDaySelect(selectedDateKey: string) {
+    if (!studentName || selectedDateKey > todayDateKey) {
+      return;
+    }
+
+    const selectedProblems = selectDailyProblems(problems, selectedDateKey);
+    const existingResult = homeHistory.find((result) => result.dateKey === selectedDateKey);
+    const draft = getDailyDraft(studentName, selectedDateKey, activeStorage);
+
+    setDateKey(selectedDateKey);
+    setHistory(homeHistory);
+
+    if (existingResult) {
+      restoreCompletedRoute(existingResult, {
+        screen: "question",
+        questionIndex: 0,
+        dateKey: selectedDateKey
+      });
+      navigateTo({ screen: "question", questionIndex: 0 }, "push", selectedDateKey);
+      return;
+    }
+
+    if (draft) {
+      const firstIncompleteQuestionIndex = getFirstIncompleteQuestionIndex(
+        draft.questionResults,
+        selectedProblems.length
+      );
+
+      if (firstIncompleteQuestionIndex >= selectedProblems.length) {
+        restoreDraftResultsRoute(studentName, draft, selectedDateKey, selectedProblems);
+        navigateTo({ screen: "results" }, "push", selectedDateKey);
+        return;
+      }
+
+      const questionIndex = Math.min(
+        clampQuestionIndex(draft.currentIndex, selectedProblems.length),
+        firstIncompleteQuestionIndex
+      );
+      restoreQuestionRoute(draft, questionIndex, selectedProblems);
+      navigateTo({ screen: "question", questionIndex }, "push", selectedDateKey);
+      return;
+    }
+
+    setCurrentResult(null);
+    setQuestionResults([]);
+    setCurrentIndex(0);
+    setSelectedChoiceId(null);
+    setAttemptedChoiceIds([]);
+    setCheckedResult(null);
+    setIsCurrentQuestionFinalized(false);
+    updateTimer(pausedTimer(0));
+    setMode("ready");
+    navigateTo({ screen: "ready" }, "push", selectedDateKey);
   }
 
   function handleReadyContinue() {
@@ -870,6 +1018,7 @@ export function DailyGame({
   }
 
   function showHome() {
+    setDateKey(todayDateKey);
     setMode("home");
     navigateTo({ screen: "home" });
   }
@@ -886,17 +1035,22 @@ export function DailyGame({
           isSwitchingPlayer={isSwitchingPlayer}
           leaderboard={leaderboard}
           history={homeHistory}
+          isPhotoSaving={isPhotoSaving}
           nameInput={nameInput}
           onCancelSwitchPlayer={handleCancelSwitchPlayer}
           onNameChange={setNameInput}
+          onPhotoChange={handleProfilePhotoChange}
+          onSelectStreakDay={handleStreakDaySelect}
           onSwitchPlayer={handleSwitchPlayer}
           onSubmit={handleStart}
+          photoDataUrl={profilePhoto}
+          photoError={photoError}
           savedName={studentName}
         />
       ) : null}
 
       {mode === "ready" ? (
-        <ReadyScreen onBack={showHome} onContinue={handleReadyContinue} />
+        <ReadyScreen dateKey={dateKey} onBack={showHome} onContinue={handleReadyContinue} />
       ) : null}
 
       {mode === "quiz" || mode === "review" ? (
@@ -935,11 +1089,12 @@ export function DailyGame({
 }
 
 type ReadyScreenProps = {
+  dateKey: string;
   onBack(): void;
   onContinue(): void;
 };
 
-function ReadyScreen({ onBack, onContinue }: ReadyScreenProps) {
+function ReadyScreen({ dateKey, onBack, onContinue }: ReadyScreenProps) {
   const [message, setMessage] = useState(READY_MESSAGES[0]);
 
   useEffect(() => {
@@ -959,6 +1114,7 @@ function ReadyScreen({ onBack, onContinue }: ReadyScreenProps) {
           <Pencil size={42} />
         </div>
         <h1>Do you have your pencil and paper ready?</h1>
+        <p className="ready-date">Challenge for {formatDateKey(dateKey)}</p>
         <p>{message}</p>
       </div>
 
@@ -981,14 +1137,19 @@ type HomeScreenProps = {
   isProfileLoading: boolean;
   isStarting: boolean;
   isSwitchingPlayer: boolean;
+  isPhotoSaving: boolean;
   leaderboard: LeaderboardEntry[];
   history: DailyResult[];
   nameInput: string;
   onCancelSwitchPlayer(): void;
   onNameChange(name: string): void;
+  onPhotoChange(event: ChangeEvent<HTMLInputElement>): void;
+  onSelectStreakDay(dateKey: string): void;
   onSwitchPlayer(): void;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   savedName: string;
+  photoDataUrl: string;
+  photoError: string;
 };
 
 function HomeScreen({
@@ -998,14 +1159,19 @@ function HomeScreen({
   isProfileLoading,
   isStarting,
   isSwitchingPlayer,
+  isPhotoSaving,
   leaderboard,
   history,
   nameInput,
   onCancelSwitchPlayer,
   onNameChange,
+  onPhotoChange,
+  onSelectStreakDay,
   onSwitchPlayer,
   onSubmit,
-  savedName
+  savedName,
+  photoDataUrl,
+  photoError
 }: HomeScreenProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const nameLabelId = "student-name-label";
@@ -1052,6 +1218,7 @@ function HomeScreen({
             days={streakDays.days}
             hasActiveDay={streakDays.hasActiveDay}
             isLoading={isHomeHistoryLoading}
+            onSelectDay={onSelectStreakDay}
           />
         ) : (
           <div className="home-streak-blank" aria-hidden="true" />
@@ -1069,15 +1236,37 @@ function HomeScreen({
                 <span aria-hidden="true" className="name-skeleton-bar" />
               </div>
             ) : savedName ? (
+              <>
               <div aria-labelledby={nameLabelId} className="name-display">
-                <span className="name-avatar" aria-hidden="true">
-                  <UserRound size={19} />
-                </span>
+                <label
+                  aria-label={`${photoDataUrl ? "Change" : "Add"} profile photo for ${savedName}`}
+                  className={["name-avatar", "name-avatar-editable", isPhotoSaving ? "saving" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {photoDataUrl ? (
+                    <img alt="" src={photoDataUrl} />
+                  ) : (
+                    <UserRound aria-hidden="true" size={19} />
+                  )}
+                  <span className="name-avatar-camera" aria-hidden="true">
+                    <Camera size={10} />
+                  </span>
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="visually-hidden"
+                    disabled={isPhotoSaving}
+                    onChange={onPhotoChange}
+                    type="file"
+                  />
+                </label>
                 <span className="name-display-text">{savedName}</span>
                 <button className="name-switch-btn" onClick={onSwitchPlayer} type="button">
                   Switch
                 </button>
               </div>
+              {photoError ? <p className="profile-photo-error" role="alert">{photoError}</p> : null}
+              </>
             ) : (
               <input
                 aria-labelledby={nameLabelId}
@@ -1239,11 +1428,13 @@ type HomeStreakDay = {
 function HomeStreakStrip({
   days,
   hasActiveDay,
-  isLoading
+  isLoading,
+  onSelectDay
 }: {
   days: HomeStreakDay[];
   hasActiveDay: boolean;
   isLoading: boolean;
+  onSelectDay(dateKey: string): void;
 }) {
   if (isLoading) {
     return (
@@ -1273,13 +1464,15 @@ function HomeStreakStrip({
         {days.map((day) => (
           <div className="home-streak-day" key={day.dateKey}>
             <span className="home-streak-day-label">{day.dayLabel}</span>
-            <span
+            <button
               aria-label={day.medal ? `${day.dayLabel} ${day.medal}` : `${day.dayLabel} blank`}
               className={["home-streak-spot", day.medal ?? "blank"].join(" ")}
               data-testid={`streak-spot-${day.dateKey}`}
+              onClick={() => onSelectDay(day.dateKey)}
+              type="button"
             >
               {day.medal ? getStreakSpotLabel(day.medal) : ""}
-            </span>
+            </button>
           </div>
         ))}
       </div>
@@ -1308,17 +1501,14 @@ function buildHomeStreakDays(
   const lookbackKeys = Array.from({ length: 7 }, (_, index) =>
     addDaysToDateKey(todayKey, index - 6)
   );
-  const oldestActiveKey = lookbackKeys.find((dateKey) => resultByDate.has(dateKey));
-  const startKey = oldestActiveKey ?? lookbackKeys[0];
 
   return {
-    hasActiveDay: Boolean(oldestActiveKey),
-    days: Array.from({ length: 7 }, (_, index) => {
-      const dateKey = addDaysToDateKey(startKey, index);
+    hasActiveDay: lookbackKeys.some((dateKey) => resultByDate.has(dateKey)),
+    days: lookbackKeys.map((dateKey) => {
       return {
         dateKey,
         dayLabel: formatWeekdayLabel(dateKey),
-        medal: dateKey <= todayKey ? resultByDate.get(dateKey)?.medal ?? null : null
+        medal: resultByDate.get(dateKey)?.medal ?? null
       };
     })
   };
@@ -1963,4 +2153,52 @@ async function loadRemoteHistoryWithLocalFallback(
       results: localHistory
     };
   }
+}
+
+function resizeProfilePhoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("Profile photo must be an image."));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Profile photo could not be read."));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("Profile photo could not be decoded."));
+      image.onload = () => {
+        const size = 256;
+        const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+        const sourceX = (image.naturalWidth - sourceSize) / 2;
+        const sourceY = (image.naturalHeight - sourceSize) / 2;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          reject(new Error("Profile photo could not be resized."));
+          return;
+        }
+
+        context.fillStyle = "#fffdf7";
+        context.fillRect(0, 0, size, size);
+        context.drawImage(
+          image,
+          sourceX,
+          sourceY,
+          sourceSize,
+          sourceSize,
+          0,
+          0,
+          size,
+          size
+        );
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
 }

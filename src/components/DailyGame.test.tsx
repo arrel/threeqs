@@ -12,9 +12,11 @@ import { problems } from "@/data/problems";
 import { getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems } from "@/lib/daily";
 import {
+  getSavedStudentPhoto,
   replaceStudentHistory,
   saveCachedLeaderboard,
   saveStudentName,
+  saveStudentPhoto,
   type StorageLike,
 } from "@/lib/storage";
 import type { DailyResult } from "@/lib/types";
@@ -981,7 +983,63 @@ describe("DailyGame", () => {
     expect(screen.getByLabelText("Tue blank")).toBeInTheDocument();
     expect(screen.getByLabelText("Wed gold")).toBeInTheDocument();
     expect(screen.getByTestId("streak-spot-2026-06-22")).toBeInTheDocument();
-    expect(screen.getByTestId("streak-spot-2026-06-28")).toBeInTheDocument();
+    expect(screen.getByTestId("streak-spot-2026-06-18")).toBeInTheDocument();
+  });
+
+  it("opens a completed previous streak day in answer review", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const previousDateKey = "2026-06-23";
+    const previousProblems = selectDailyProblems(problems, previousDateKey);
+
+    saveStudentName("Ada", storage);
+    replaceStudentHistory(
+      "Ada",
+      [makeAnsweredDailyResult(previousDateKey, "Ada")],
+      storage
+    );
+
+    render(<DailyGame storage={storage} today={today} />);
+    await user.click(screen.getByTestId(`streak-spot-${previousDateKey}`));
+
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
+    expect(screen.getByTestId(`choice-${previousProblems[0].correctChoiceId}`)).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.queryByText(/^check$/i)).not.toBeInTheDocument();
+  });
+
+  it("starts an unanswered previous streak day with that day's questions", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const previousDateKey = "2026-06-22";
+    const [previousProblem] = selectDailyProblems(problems, previousDateKey);
+
+    saveStudentName("Ada", storage);
+    render(<DailyGame storage={storage} today={today} />);
+
+    await user.click(screen.getByTestId(`streak-spot-${previousDateKey}`));
+    expect(screen.getByText(/Challenge for Jun 22, 2026/i)).toBeInTheDocument();
+    await user.click(getButtonByText(/^I'm Ready$/i));
+
+    expect(screen.getByLabelText(/Question 1 of 3/i)).toBeInTheDocument();
+    expect(screen.getByTestId(`choice-${previousProblem.correctChoiceId}`)).toBeInTheDocument();
+  });
+
+  it("shows a saved profile photo in the player control", () => {
+    const storage = createMemoryStorage();
+    const photoDataUrl = "data:image/jpeg;base64,cGhvdG8=";
+    saveStudentName("Ada", storage);
+    saveStudentPhoto("Ada", photoDataUrl, storage);
+
+    render(<DailyGame storage={storage} today={new Date("2026-06-24T18:00:00Z")} />);
+
+    const photoControl = screen.getByLabelText("Change profile photo for Ada");
+    expect(photoControl.querySelector("img")).toHaveAttribute("src", photoDataUrl);
+    expect(getSavedStudentPhoto(storage)).toBe(photoDataUrl);
   });
 
   it("shows seven filled streak spots when the last seven days are complete through today", () => {
@@ -1125,6 +1183,26 @@ function makeDailyResult(
     completedAt: new Date().toISOString(),
     questionResults: [],
     shareText: "",
+  };
+}
+
+function makeAnsweredDailyResult(dateKey: string, studentName: string): DailyResult {
+  const dailyProblems = selectDailyProblems(problems, dateKey);
+  return {
+    ...makeDailyResult(dateKey, studentName, "gold"),
+    totalScore: 390,
+    questionResults: dailyProblems.map((problem) => ({
+      problemId: problem.id,
+      difficulty: problem.difficulty,
+      selectedChoiceIds: [problem.correctChoiceId],
+      correctChoiceId: problem.correctChoiceId,
+      attemptsUsed: 1,
+      solved: true,
+      elapsedSeconds: 5,
+      attemptPoints: 100,
+      speedBonus: 30,
+      score: 130
+    }))
   };
 }
 

@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateCurrentStreak,
+  clearDailyDraft,
   clearSavedStudentName,
   getCachedLeaderboard,
   getDailyResult,
   getSavedStudentName,
+  getSavedStudentPhoto,
+  getDailyDraft,
   getStudentHistory,
   normalizeStudentName,
   replaceStudentHistory,
   saveCachedLeaderboard,
   saveDailyResult,
+  saveDailyDraft,
   saveStudentName,
+  saveStudentPhoto,
   type StorageLike
 } from "@/lib/storage";
 import type { DailyResult } from "@/lib/types";
@@ -27,6 +32,29 @@ describe("local result storage", () => {
     clearSavedStudentName("Ada", storage);
 
     expect(getSavedStudentName(storage)).toBe("");
+  });
+
+  it("keeps a photo with the saved student profile", () => {
+    const storage = createMemoryStorage();
+    saveStudentName("Ada", storage);
+    saveStudentPhoto("Ada", "data:image/jpeg;base64,cGhvdG8=", storage);
+
+    expect(getSavedStudentPhoto(storage)).toBe("data:image/jpeg;base64,cGhvdG8=");
+    saveStudentName("Ada", storage);
+    expect(getSavedStudentPhoto(storage)).toBe("data:image/jpeg;base64,cGhvdG8=");
+  });
+
+  it("stores independent drafts for multiple days", () => {
+    const storage = createMemoryStorage();
+    saveDailyDraft(createDraft("2026-06-23", 0), storage);
+    saveDailyDraft(createDraft("2026-06-24", 1), storage);
+
+    expect(getDailyDraft("Ada", "2026-06-23", storage)?.currentIndex).toBe(0);
+    expect(getDailyDraft("Ada", "2026-06-24", storage)?.currentIndex).toBe(1);
+
+    clearDailyDraft("Ada", "2026-06-23", storage);
+    expect(getDailyDraft("Ada", "2026-06-23", storage)).toBeNull();
+    expect(getDailyDraft("Ada", "2026-06-24", storage)?.currentIndex).toBe(1);
   });
 
   it("saves one result per student per date", () => {
@@ -99,5 +127,19 @@ function createResult(studentName: string, dateKey: string, totalScore: number):
     completedAt: `${dateKey}T12:00:00.000Z`,
     questionResults: [],
     shareText: "share"
+  };
+}
+
+function createDraft(dateKey: string, currentIndex: number) {
+  return {
+    dateKey,
+    studentName: "Ada",
+    currentIndex,
+    questionResults: [],
+    selectedChoiceId: null,
+    attemptedChoiceIds: [],
+    checkedResult: null,
+    isCurrentQuestionFinalized: false,
+    questionElapsedMs: 0
   };
 }
