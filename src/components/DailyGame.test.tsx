@@ -1060,6 +1060,59 @@ describe("DailyGame", () => {
     await waitFor(() => expect(screen.queryByTestId("leaderboard-sheet")).not.toBeInTheDocument());
   });
 
+  it("shows leaderboard photos and opens another player's full profile", async () => {
+    const user = userEvent.setup();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const photoDataUrl = "data:image/jpeg;base64,cmlsZXk=";
+    const rileyHistory = [makeAnsweredDailyResult("2026-06-24", "Riley")];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/api/leaderboard")) {
+          return jsonResponse({
+            entries: [
+              {
+                studentName: "Riley",
+                photoDataUrl,
+                totalPoints: 390,
+                gold: 1,
+                silver: 0,
+                bronze: 0
+              }
+            ]
+          });
+        }
+
+        if (url.includes("/api/profile")) {
+          return jsonResponse({ photoDataUrl, studentName: "Riley" });
+        }
+
+        if (url.includes("/api/results")) {
+          return jsonResponse({ results: rileyHistory });
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      })
+    );
+
+    render(<DailyGame today={today} />);
+    await user.click(screen.getByRole("button", { name: "Open leaderboard" }));
+
+    const playerButton = await screen.findByRole("button", { name: "Open profile for Riley" });
+    expect(playerButton.querySelector("img")).toHaveAttribute("src", photoDataUrl);
+    await user.click(playerButton);
+
+    const profileSheet = await screen.findByTestId("player-profile-sheet");
+    expect(within(profileSheet).getByRole("heading", { name: "Riley" })).toBeInTheDocument();
+    const lifetimeStats = within(profileSheet).getByLabelText("Lifetime stats");
+    expect(within(lifetimeStats).getByText("390")).toBeInTheDocument();
+    expect(within(profileSheet).getByText("Wed, Jun 24")).toBeInTheDocument();
+    expect(within(profileSheet).queryByLabelText(/profile photo for Riley/i)).not.toBeInTheDocument();
+  });
+
   it("renders recent streak medals with blank gaps from the oldest active day", () => {
     const storage = createMemoryStorage();
     const today = new Date("2026-06-24T18:00:00Z");
@@ -1141,7 +1194,8 @@ describe("DailyGame", () => {
     expect(screen.getByTestId(`choice-${previousProblem.correctChoiceId}`)).toBeInTheDocument();
   });
 
-  it("shows a saved profile photo in the player control", () => {
+  it("moves the current player's photo editor into their profile sheet", async () => {
+    const user = userEvent.setup();
     const storage = createMemoryStorage();
     const photoDataUrl = "data:image/jpeg;base64,cGhvdG8=";
     saveStudentName("Ada", storage);
@@ -1149,9 +1203,32 @@ describe("DailyGame", () => {
 
     render(<DailyGame storage={storage} today={new Date("2026-06-24T18:00:00Z")} />);
 
-    const photoControl = screen.getByLabelText("Change profile photo for Ada");
+    const profileButton = screen.getByRole("button", { name: "Open profile for Ada" });
+    expect(profileButton.querySelector("img")).toHaveAttribute("src", photoDataUrl);
+    expect(screen.queryByLabelText("Change profile photo for Ada")).not.toBeInTheDocument();
+
+    await user.click(profileButton);
+
+    const profileSheet = await screen.findByTestId("player-profile-sheet");
+    const photoControl = within(profileSheet).getByLabelText("Change profile photo for Ada");
     expect(photoControl.querySelector("img")).toHaveAttribute("src", photoDataUrl);
+    expect(photoControl.querySelector(".profile-avatar-edit-overlay")).toBeInTheDocument();
+    expect(photoControl.querySelector(".profile-avatar-edit-badge")).not.toBeInTheDocument();
     expect(getSavedStudentPhoto(storage)).toBe(photoDataUrl);
+  });
+
+  it("shows a clear add-photo state in the current player's profile", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    saveStudentName("Ada", storage);
+
+    render(<DailyGame storage={storage} today={new Date("2026-06-24T18:00:00Z")} />);
+    await user.click(screen.getByRole("button", { name: "Open profile for Ada" }));
+
+    const profileSheet = await screen.findByTestId("player-profile-sheet");
+    const photoControl = within(profileSheet).getByLabelText("Add profile photo for Ada");
+    expect(within(photoControl).getByText("Add photo")).toBeInTheDocument();
+    expect(photoControl.querySelector("img")).not.toBeInTheDocument();
   });
 
   it("shows seven filled streak spots when the last seven days are complete through today", () => {

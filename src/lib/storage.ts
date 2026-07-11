@@ -266,6 +266,7 @@ function mergeLeaderboardEntries(entries: LeaderboardEntry[]): LeaderboardEntry[
       byStudent.get(studentKey) ??
       ({
         studentName: normalizeStudentName(entry.studentName),
+        ...(entry.photoDataUrl ? { photoDataUrl: entry.photoDataUrl } : {}),
         totalPoints: 0,
         gold: 0,
         silver: 0,
@@ -276,6 +277,9 @@ function mergeLeaderboardEntries(entries: LeaderboardEntry[]): LeaderboardEntry[
     current.gold += entry.gold;
     current.silver += entry.silver;
     current.bronze += entry.bronze;
+    if (!current.photoDataUrl && entry.photoDataUrl) {
+      current.photoDataUrl = entry.photoDataUrl;
+    }
     byStudent.set(studentKey, current);
   }
 
