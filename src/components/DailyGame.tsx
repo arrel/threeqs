@@ -1407,6 +1407,7 @@ function HomeScreen({
 
       <BottomSheet
         backdropTestId="leaderboard-backdrop"
+        className="leaderboard-sheet"
         closeLabel="Close leaderboard"
         onDismiss={() => setIsLeaderboardOpen(false)}
         open={isLeaderboardOpen}
@@ -1485,33 +1486,27 @@ function Leaderboard({
                     name={entry.studentName}
                     photoDataUrl={entry.photoDataUrl ?? ""}
                   />
-                  <span className="leaderboard-name">{entry.studentName}</span>
+                  <span className="leaderboard-player-details">
+                    <span className="leaderboard-name">{entry.studentName}</span>
+                    <span className="leaderboard-medals">
+                      {entry.gold > 0 && (
+                        <span className="lb-medal gold" data-tip={`${entry.gold} gold`}>
+                          {entry.gold}
+                        </span>
+                      )}
+                      {entry.silver > 0 && (
+                        <span className="lb-medal silver" data-tip={`${entry.silver} silver`}>
+                          {entry.silver}
+                        </span>
+                      )}
+                      {entry.bronze > 0 && (
+                        <span className="lb-medal bronze" data-tip={`${entry.bronze} bronze`}>
+                          {entry.bronze}
+                        </span>
+                      )}
+                    </span>
+                  </span>
                 </button>
-                <span className="leaderboard-medals">
-                  {entry.gold > 0 && (
-                    <span className="lb-medal gold" data-tip={`${entry.gold} gold`} tabIndex={0}>
-                      {entry.gold}
-                    </span>
-                  )}
-                  {entry.silver > 0 && (
-                    <span
-                      className="lb-medal silver"
-                      data-tip={`${entry.silver} silver`}
-                      tabIndex={0}
-                    >
-                      {entry.silver}
-                    </span>
-                  )}
-                  {entry.bronze > 0 && (
-                    <span
-                      className="lb-medal bronze"
-                      data-tip={`${entry.bronze} bronze`}
-                      tabIndex={0}
-                    >
-                      {entry.bronze}
-                    </span>
-                  )}
-                </span>
                 <span className="leaderboard-pts">{entry.totalPoints}<small>pts</small></span>
               </li>
             ))}
