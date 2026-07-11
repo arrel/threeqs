@@ -1,5 +1,6 @@
-import type { DailyResult, Medal, QuestionResult } from "@/lib/types";
+import type { DailyResult, QuestionResult } from "@/lib/types";
 import { formatElapsedSeconds } from "@/lib/time";
+import { getMedal, getMedalLabel } from "@/lib/medals";
 
 export const MAX_ATTEMPTS = 2;
 export const MAX_DAILY_SCORE = 390;
@@ -66,54 +67,6 @@ export function scoreQuestion(input: {
   };
 }
 
-export function getMedal(totalScore: number): Medal {
-  if (totalScore >= 330) {
-    return "gold";
-  }
-
-  if (totalScore >= 240) {
-    return "silver";
-  }
-
-  if (totalScore >= 150) {
-    return "bronze";
-  }
-
-  return "practice";
-}
-
-export type QuestionMedal = "gold" | "silver" | "bronze";
-
-// Per-question medal derived from that question's score (max 130). With the
-// scoring rules, gold == first-try, silver == second-try, bronze == missed.
-export function getQuestionMedal(score: number): QuestionMedal {
-  if (score >= 100) {
-    return "gold";
-  }
-
-  if (score >= 50) {
-    return "silver";
-  }
-
-  return "bronze";
-}
-
-export function getMedalLabel(medal: Medal): string {
-  if (medal === "gold") {
-    return "Gold";
-  }
-
-  if (medal === "silver") {
-    return "Silver";
-  }
-
-  if (medal === "bronze") {
-    return "Bronze";
-  }
-
-  return "Practice";
-}
-
 export function buildDailyResult(input: {
   dateKey: string;
   studentName: string;
@@ -137,6 +90,18 @@ export function buildDailyResult(input: {
   return {
     ...result,
     shareText: buildShareText(result)
+  };
+}
+
+export function canonicalizeDailyResult(result: DailyResult): DailyResult {
+  const canonicalResult = {
+    ...result,
+    medal: getMedal(result.totalScore)
+  };
+
+  return {
+    ...canonicalResult,
+    shareText: buildShareText(canonicalResult)
   };
 }
 

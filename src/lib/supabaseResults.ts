@@ -1,5 +1,6 @@
 import { getStudentKey, normalizeStudentName } from "@/lib/storage";
 import { isDisallowedStudentName } from "@/lib/server/studentNamePolicy";
+import { canonicalizeDailyResult } from "@/lib/score";
 import type { DailyResult, Medal, QuestionResult } from "@/lib/types";
 
 type SupabaseConfig = {
@@ -122,16 +123,18 @@ export async function loadSupabaseHistory(studentName: string): Promise<DailyRes
 }
 
 export async function saveSupabaseDailyResult(result: DailyResult): Promise<DailyResult> {
-  if (isDisallowedStudentName(result.studentName)) {
+  const canonicalResult = canonicalizeDailyResult(result);
+
+  if (isDisallowedStudentName(canonicalResult.studentName)) {
     return {
-      ...result,
-      studentName: normalizeStudentName(result.studentName)
+      ...canonicalResult,
+      studentName: normalizeStudentName(canonicalResult.studentName)
     };
   }
 
-  const student = await getOrCreateStudent(result.studentName);
-  const studentName = normalizeStudentName(result.studentName);
-  const existingResult = await findDailyResult(student.id, result.dateKey);
+  const student = await getOrCreateStudent(canonicalResult.studentName);
+  const studentName = normalizeStudentName(canonicalResult.studentName);
+  const existingResult = await findDailyResult(student.id, canonicalResult.dateKey);
 
   if (existingResult) {
     return existingResult;
@@ -141,13 +144,13 @@ export async function saveSupabaseDailyResult(result: DailyResult): Promise<Dail
 
   try {
     dailyRow = await insertDailyResult({
-      result,
+      result: canonicalResult,
       studentId: student.id,
       studentName
     });
   } catch (error) {
     if (isUniqueViolation(error)) {
-      const duplicateResult = await findDailyResult(student.id, result.dateKey);
+      const duplicateResult = await findDailyResult(student.id, canonicalResult.dateKey);
 
       if (duplicateResult) {
         return duplicateResult;
@@ -157,17 +160,17 @@ export async function saveSupabaseDailyResult(result: DailyResult): Promise<Dail
     throw error;
   }
 
-  if (result.questionResults.length > 0) {
+  if (canonicalResult.questionResults.length > 0) {
     await insertQuestionResults({
       dailyResultId: dailyRow.id,
-      result,
+      result: canonicalResult,
       studentId: student.id,
       studentName
     });
   }
 
   return {
-    ...result,
+    ...canonicalResult,
     studentName
   };
 }

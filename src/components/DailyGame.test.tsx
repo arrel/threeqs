@@ -12,6 +12,7 @@ import { problems } from "@/data/problems";
 import { getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems } from "@/lib/daily";
 import {
+  getDailyResult,
   getSavedStudentPhoto,
   replaceStudentHistory,
   saveCachedLeaderboard,
@@ -73,6 +74,103 @@ describe("DailyGame", () => {
 
     expect(screen.getByText(/challenge complete/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Question 1 of 3/i)).not.toBeInTheDocument();
+  });
+
+  it("saves a local result before Continue is tapped", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const dailyProblems = selectDailyProblems(problems, dateKey);
+
+    render(<DailyGame storage={storage} today={today} />);
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await startFromHome(user);
+
+    for (const problem of dailyProblems) {
+      await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
+      await user.click(getButtonByText(/^check$/i));
+      await user.click(getButtonByText(/^next$/i));
+    }
+
+    expect(await screen.findByText(/challenge complete/i)).toBeInTheDocument();
+    expect(getDailyResult("Ada", dateKey, storage)).toMatchObject({
+      dateKey,
+      studentName: "Ada"
+    });
+  });
+
+  it("shows the result while saving remotely and does not save again on Continue", async () => {
+    const user = userEvent.setup();
+    const today = new Date("2026-06-24T18:00:00Z");
+    const dateKey = getPacificDateKey(today);
+    const dailyProblems = selectDailyProblems(problems, dateKey);
+    let postedResult: DailyResult | null = null;
+    let savedResult: DailyResult | null = null;
+    const remoteSave = { resolve: undefined as (() => void) | undefined };
+
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url.includes("/api/leaderboard")) {
+        return jsonResponse({ entries: [] });
+      }
+
+      if (url.includes("/api/profile")) {
+        return jsonResponse({ photoDataUrl: "", studentName: "Ada" });
+      }
+
+      if (url.includes("/api/results") && init?.method === "POST") {
+        postedResult = JSON.parse(String(init.body)) as DailyResult;
+        return new Promise<Response>((resolve) => {
+          remoteSave.resolve = () => {
+            savedResult = postedResult;
+            resolve(jsonResponse({ accepted: true, result: postedResult }));
+          };
+        });
+      }
+
+      if (url.includes("/api/results")) {
+        return jsonResponse({ accepted: true, results: savedResult ? [savedResult] : [] });
+      }
+
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    render(<DailyGame today={today} />);
+    await user.type(screen.getByLabelText(/your name/i), "Ada");
+    await startFromHome(user);
+
+    for (const [index, problem] of dailyProblems.entries()) {
+      await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
+      await user.click(getButtonByText(/^check$/i));
+      await user.click(getButtonByText(/^next$/i));
+
+      if (index === dailyProblems.length - 1) {
+        await waitFor(() => expect(remoteSave.resolve).toBeDefined());
+        expect(screen.getByText(/challenge complete/i)).toBeInTheDocument();
+        expect(getButtonByText(/^continue$/i)).toBeDisabled();
+        expect(getDailyResult("Ada", dateKey)).toMatchObject({ dateKey, studentName: "Ada" });
+        remoteSave.resolve?.();
+      }
+    }
+
+    expect(await screen.findByText(/challenge complete/i)).toBeInTheDocument();
+    await waitFor(() => expect(getButtonByText(/^continue$/i)).toBeEnabled());
+    expect(postedResult).toMatchObject({ dateKey, studentName: "Ada" });
+    expect(
+      fetch.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(1);
+    expect(
+      fetch.mock.calls.find(([, init]) => init?.method === "POST")?.[1]
+    ).toMatchObject({ keepalive: true });
+
+    await user.click(getButtonByText(/^continue$/i));
+    expect(await screen.findByText(/current streak/i)).toBeInTheDocument();
+    expect(
+      fetch.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(1);
   });
 
   it("shows a pencil and paper check before the first fresh question", async () => {
@@ -528,7 +626,7 @@ describe("DailyGame", () => {
     });
   });
 
-  it("reloads the results route from a complete unsaved draft", async () => {
+  it("reloads the automatically saved result route without requiring Continue", async () => {
     const user = userEvent.setup();
     const storage = createMemoryStorage();
     const today = new Date("2026-06-24T18:00:00Z");
@@ -1039,6 +1137,20 @@ describe("DailyGame", () => {
     expect(screen.getByTestId("streak-spot-2026-06-18")).toBeInTheDocument();
   });
 
+  it("shows the persisted medal for a completed day even if current thresholds differ", () => {
+    const storage = createMemoryStorage();
+    const persistedResult = {
+      ...makeDailyResult("2026-06-24", "Ada", "gold"),
+      totalScore: 240
+    };
+
+    saveStudentName("Ada", storage);
+    replaceStudentHistory("Ada", [persistedResult], storage);
+    render(<DailyGame storage={storage} today={new Date("2026-06-24T18:00:00Z")} />);
+
+    expect(screen.getByLabelText("Wed gold")).toBeInTheDocument();
+  });
+
   it("opens a completed previous streak day in answer review", async () => {
     const user = userEvent.setup();
     const storage = createMemoryStorage();
@@ -1251,10 +1363,17 @@ function makeDailyResult(
   studentName: string,
   medal: DailyResult["medal"] = "practice"
 ): DailyResult {
+  const totalScore = {
+    gold: 330,
+    silver: 240,
+    bronze: 150,
+    practice: 0
+  }[medal];
+
   return {
     dateKey,
     studentName,
-    totalScore: 0,
+    totalScore,
     maxScore: 390,
     medal,
     completedAt: new Date().toISOString(),

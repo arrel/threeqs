@@ -17,12 +17,11 @@ import {
   type RemoteHistory
 } from "@/lib/remoteResults";
 import type { LeaderboardEntry } from "@/lib/supabaseLeaderboard";
+import { getMedalLabel, getQuestionMedal } from "@/lib/medals";
 import {
   MAX_ATTEMPTS,
   MAX_DAILY_SCORE,
   buildDailyResult,
-  getMedalLabel,
-  getQuestionMedal,
   scoreQuestion
 } from "@/lib/score";
 import {
@@ -434,7 +433,7 @@ export function DailyGame({
     }
 
     if (route.screen === "results") {
-      restoreDraftResultsRoute(savedName, draft);
+      void restoreDraftResultsRoute(savedName, draft);
       return;
     }
 
@@ -543,7 +542,7 @@ export function DailyGame({
     forceHome();
   }
 
-  function restoreDraftResultsRoute(
+  async function restoreDraftResultsRoute(
     savedName: string,
     draft: DailyDraft | null,
     targetDateKey = dateKey,
@@ -558,14 +557,16 @@ export function DailyGame({
       return;
     }
 
-    setCurrentResult(
-      buildDailyResult({
-        dateKey: targetDateKey,
-        studentName: savedName,
-        questionResults: completeResults
-      })
-    );
-    setQuestionResults(completeResults);
+    const result = buildDailyResult({
+      dateKey: targetDateKey,
+      studentName: savedName,
+      questionResults: completeResults
+    });
+
+    setIsSavingResult(true);
+    const savingResult = persistCompletedResult(result);
+    setCurrentResult(result);
+    setQuestionResults(result.questionResults);
     setCurrentIndex(targetProblems.length - 1);
     setSelectedChoiceId(null);
     setAttemptedChoiceIds([]);
@@ -573,6 +574,14 @@ export function DailyGame({
     setIsCurrentQuestionFinalized(false);
     updateTimer(pausedTimer(0));
     setMode("score");
+
+    try {
+      const savedResult = await savingResult;
+      setCurrentResult(savedResult);
+      setQuestionResults(savedResult.questionResults);
+    } finally {
+      setIsSavingResult(false);
+    }
   }
 
   function restoreQuestionRoute(
@@ -705,7 +714,7 @@ export function DailyGame({
         );
 
         if (firstIncompleteQuestionIndex >= dailyProblems.length) {
-          restoreDraftResultsRoute(nextStudentName, draft);
+          void restoreDraftResultsRoute(nextStudentName, draft);
           navigateTo({ screen: "results" });
           return;
         }
@@ -776,7 +785,7 @@ export function DailyGame({
       );
 
       if (firstIncompleteQuestionIndex >= selectedProblems.length) {
-        restoreDraftResultsRoute(studentName, draft, selectedDateKey, selectedProblems);
+        void restoreDraftResultsRoute(studentName, draft, selectedDateKey, selectedProblems);
         navigateTo({ screen: "results" }, "push", selectedDateKey);
         return;
       }
@@ -863,7 +872,11 @@ export function DailyGame({
     setIsCurrentQuestionFinalized(true);
   }
 
-  function handleNextQuestion() {
+  async function handleNextQuestion() {
+    if (isSavingResult) {
+      return;
+    }
+
     const storedResult = getQuestionResultAt(questionResults, currentIndex);
 
     if (!storedResult && (!checkedResult || !isCurrentQuestionFinalized)) {
@@ -922,9 +935,20 @@ export function DailyGame({
       checkedResult: null,
       isCurrentQuestionFinalized: false
     });
+    setIsSavingResult(true);
+    const savingResult = persistCompletedResult(nextResult);
     setCurrentResult(nextResult);
+    setQuestionResults(nextResult.questionResults);
     setMode("score");
     navigateTo({ screen: "results" });
+
+    try {
+      const savedResult = await savingResult;
+      setCurrentResult(savedResult);
+      setQuestionResults(savedResult.questionResults);
+    } finally {
+      setIsSavingResult(false);
+    }
   }
 
   function handleBackQuestion() {
@@ -1002,32 +1026,11 @@ export function DailyGame({
     setIsSavingResult(true);
 
     try {
-      let savedResult = currentResult;
-
-      if (shouldUseRemoteResults) {
-        try {
-          const remoteSave = await saveRemoteDailyResult(currentResult);
-          savedResult = remoteSave.result;
-
-          if (remoteSave.accepted) {
-            saveDailyResult(savedResult, activeStorage);
-          } else {
-            clearSavedStudentName(savedResult.studentName, activeStorage);
-          }
-        } catch {
-          saveDailyResult(savedResult, activeStorage);
-          savedResult = currentResult;
-        }
-      } else {
-        saveDailyResult(savedResult, activeStorage);
-      }
-
       const historySnapshot = shouldUseRemoteResults
-        ? await loadRemoteHistoryWithLocalFallback(savedResult.studentName, activeStorage)
-        : { accepted: true, results: getStudentHistory(savedResult.studentName, activeStorage) };
+        ? await loadRemoteHistoryWithLocalFallback(currentResult.studentName, activeStorage)
+        : { accepted: true, results: getStudentHistory(currentResult.studentName, activeStorage) };
       const nextHistory = historySnapshot.results;
 
-      clearDailyDraft(savedResult.studentName, dateKey, activeStorage);
       setHistory(nextHistory);
       setHomeHistory(nextHistory);
       setMode("streak");
@@ -1035,6 +1038,34 @@ export function DailyGame({
     } finally {
       setIsSavingResult(false);
     }
+  }
+
+  async function persistCompletedResult(result: DailyResult): Promise<DailyResult> {
+    let savedResult = result;
+
+    // Save synchronously before starting the request so closing the tab after
+    // seeing the result cannot lose the completed game locally.
+    saveDailyResult(result, activeStorage);
+    clearDailyDraft(result.studentName, result.dateKey, activeStorage);
+
+    if (shouldUseRemoteResults) {
+      try {
+        const remoteSave = await saveRemoteDailyResult(result);
+        savedResult = remoteSave.result;
+
+        if (remoteSave.accepted) {
+          saveDailyResult(savedResult, activeStorage);
+        } else {
+          clearSavedStudentName(savedResult.studentName, activeStorage);
+          replaceStudentHistory(savedResult.studentName, [], activeStorage);
+        }
+      } catch {
+        // The synchronous local save remains available and the keepalive
+        // request can still finish if the page is being unloaded.
+      }
+    }
+
+    return savedResult;
   }
 
   function handleStreakContinue() {

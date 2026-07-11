@@ -67,6 +67,17 @@ describe("local result storage", () => {
 
     expect(getStudentHistory("ada", storage)).toHaveLength(1);
     expect(getDailyResult("Ada", "2026-06-24", storage)?.totalScore).toBe(330);
+    expect(getDailyResult("Ada", "2026-06-24", storage)?.medal).toBe("silver");
+  });
+
+  it("preserves a historical medal even when it differs from current score rules", () => {
+    const storage = createMemoryStorage();
+    saveDailyResult(createResult("Ada", "2026-06-24", 330), storage);
+
+    expect(getDailyResult("Ada", "2026-06-24", storage)).toMatchObject({
+      medal: "silver",
+      totalScore: 330
+    });
   });
 
   it("replaces cached history for one student", () => {
@@ -119,6 +130,19 @@ describe("local result storage", () => {
       },
       { studentName: "Ada", totalPoints: 90, gold: 0, silver: 0, bronze: 1 }
     ]);
+  });
+
+  it("does not reuse leaderboard counts from the previous cache generation", () => {
+    const storage = createMemoryStorage();
+    storage.setItem(
+      "three-qs-leaderboard-v1",
+      JSON.stringify({
+        version: 1,
+        entries: [{ studentName: "Ada", totalPoints: 240, gold: 1, silver: 0, bronze: 0 }]
+      })
+    );
+
+    expect(getCachedLeaderboard(storage)).toBeNull();
   });
 });
 

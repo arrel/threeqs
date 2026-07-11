@@ -2,11 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildShareText,
   getAttemptPoints,
-  getMedal,
-  getQuestionMedal,
   getSpeedBonus,
   scoreQuestion
 } from "@/lib/score";
+import { getMedal, getQuestionMedal } from "@/lib/medals";
 
 describe("scoring", () => {
   it("awards attempt points for first and second try solves", () => {

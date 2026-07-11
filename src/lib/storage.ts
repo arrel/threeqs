@@ -5,7 +5,7 @@ import type { DailyResult, QuestionResult } from "@/lib/types";
 const STORAGE_KEY = "msb-daily-results-v1";
 const PROFILE_KEY = "three-qs-profile-v1";
 const DRAFT_KEY = "three-qs-daily-draft-v1";
-const LEADERBOARD_KEY = "three-qs-leaderboard-v1";
+const LEADERBOARD_KEY = "three-qs-leaderboard-v2";
 
 export type StorageLike = {
   getItem(key: string): string | null;
@@ -25,7 +25,7 @@ type StoredProfile = {
 };
 
 type StoredLeaderboard = {
-  version: 1;
+  version: 2;
   entries: LeaderboardEntry[];
 };
 
@@ -226,7 +226,7 @@ export function getCachedLeaderboard(storage = getBrowserStorage()): Leaderboard
 
   try {
     const parsed = JSON.parse(raw) as StoredLeaderboard;
-    if (parsed.version !== 1 || !Array.isArray(parsed.entries)) {
+    if (parsed.version !== 2 || !Array.isArray(parsed.entries)) {
       return null;
     }
 
@@ -247,7 +247,7 @@ export function saveCachedLeaderboard(
   storage.setItem(
     LEADERBOARD_KEY,
     JSON.stringify({
-      version: 1,
+      version: 2,
       entries: mergeLeaderboardEntries(entries)
     } satisfies StoredLeaderboard)
   );

@@ -99,6 +99,7 @@ export async function saveRemoteDailyResult(result: DailyResult): Promise<Remote
     headers: {
       "Content-Type": "application/json"
     },
+    keepalive: true,
     method: "POST"
   });
 
