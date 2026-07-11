@@ -1403,9 +1403,17 @@ function HomeScreen({
         <form className="switch-player-form" onSubmit={onSubmit}>
           <div className="switch-player-panel">
             <div className="switch-player-current">
-              <span className="switch-player-current-icon" aria-hidden="true">
-                <UserRound size={16} />
-              </span>
+              {photoDataUrl ? (
+                <PlayerAvatar
+                  className="switch-player-current-icon"
+                  name={savedName}
+                  photoDataUrl={photoDataUrl}
+                />
+              ) : (
+                <span className="switch-player-current-icon" aria-hidden="true">
+                  <UserRound size={16} />
+                </span>
+              )}
               <span className="switch-player-current-copy">
                 <span className="switch-player-kicker">Playing as</span>
                 <span className="current-player-name">{savedName}</span>
