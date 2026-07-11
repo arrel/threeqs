@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Camera, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
 import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
 import { MathText } from "@/components/MathText";
@@ -1583,7 +1583,12 @@ function PlayerProfileSheet({
     practice: profile.history.filter((result) => result.medal === "practice").length
   };
 
-  const avatar = (
+  const avatar = isCurrentPlayer && !photoDataUrl ? (
+    <span aria-hidden="true" className="profile-avatar-photo profile-avatar-empty">
+      <UserRound size={30} />
+      <span>Add photo</span>
+    </span>
+  ) : (
     <PlayerAvatar
       className="profile-avatar-photo"
       name={profile.studentName}
@@ -1612,8 +1617,8 @@ function PlayerProfileSheet({
               .join(" ")}
           >
             {avatar}
-            <span aria-hidden="true" className="profile-avatar-edit-badge">
-              <Camera size={17} />
+            <span aria-hidden="true" className="profile-avatar-edit-overlay">
+              <Pencil size={22} />
             </span>
             <input
               accept="image/jpeg,image/png,image/webp"

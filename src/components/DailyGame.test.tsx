@@ -1100,7 +1100,23 @@ describe("DailyGame", () => {
     const profileSheet = await screen.findByTestId("player-profile-sheet");
     const photoControl = within(profileSheet).getByLabelText("Change profile photo for Ada");
     expect(photoControl.querySelector("img")).toHaveAttribute("src", photoDataUrl);
+    expect(photoControl.querySelector(".profile-avatar-edit-overlay")).toBeInTheDocument();
+    expect(photoControl.querySelector(".profile-avatar-edit-badge")).not.toBeInTheDocument();
     expect(getSavedStudentPhoto(storage)).toBe(photoDataUrl);
+  });
+
+  it("shows a clear add-photo state in the current player's profile", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorage();
+    saveStudentName("Ada", storage);
+
+    render(<DailyGame storage={storage} today={new Date("2026-06-24T18:00:00Z")} />);
+    await user.click(screen.getByRole("button", { name: "Open profile for Ada" }));
+
+    const profileSheet = await screen.findByTestId("player-profile-sheet");
+    const photoControl = within(profileSheet).getByLabelText("Add profile photo for Ada");
+    expect(within(photoControl).getByText("Add photo")).toBeInTheDocument();
+    expect(photoControl.querySelector("img")).not.toBeInTheDocument();
   });
 
   it("shows seven filled streak spots when the last seven days are complete through today", () => {
