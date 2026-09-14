@@ -1994,19 +1994,82 @@ button:disabled {
     var(--paper);
 }
 
-.streak-burst {
-  display: grid;
-  width: 168px;
-  height: 168px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--yellow);
-  color: #9d5500;
-  box-shadow: 0 24px 50px rgba(245, 173, 39, 0.32);
+.streak-card .card-body {
+  gap: 12px;
+}
+
+.streak-copy {
+  animation: streak-copy-enter 700ms 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .streak-copy h1 {
+  color: #b94c18;
   font-size: clamp(5rem, 24vw, 8.5rem);
+  text-shadow: 0 3px 0 #fff4d8;
+  animation: streak-count-enter 650ms 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.home-streak-spot.gold,
+.profile-history-medal.gold,
+.medal-emblem.gold {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(135deg, #ffe69b 0%, #ffd05b 28%, #ffedb1 47%, #f6b735 65%, #fbd575 100%);
+  box-shadow: inset 0 1px 0 #fff9dd, inset 0 -2px 0 #c9892433, 0 3px 10px #d8952526;
+}
+
+/* Offset neighboring medals so their glints travel across the week. */
+.home-streak-day:nth-child(2n) .gold > span::before,
+.profile-history-list li:nth-child(2n) .gold > span::before {
+  animation-delay: -1.2s;
+}
+
+.home-streak-day:nth-child(3n) .gold > span::before,
+.profile-history-list li:nth-child(3n) .gold > span::before {
+  animation-delay: -2.4s;
+}
+
+.home-streak-spot.gold:hover,
+.home-streak-spot.gold:focus-visible {
+  box-shadow: inset 0 1px 0 #fff9dd, 0 5px 16px #d8952555;
+}
+
+.home-streak-spot.gold:focus-visible {
+  outline: 2px solid #8b5200;
+  outline-offset: 3px;
+}
+
+.medal-emblem.gold {
+  animation: gold-award-enter 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes gold-award-enter {
+  0% { opacity: 0; transform: scale(0.65) rotate(-14deg); }
+  55% { opacity: 1; transform: scale(1.08) rotate(4deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes streak-copy-enter {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes streak-count-enter {
+  0% { transform: scale(0.65); }
+  55% { transform: scale(1.1); }
+  100% { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streak-copy,
+  .streak-copy h1,
+  .medal-emblem.gold {
+    animation: none;
+  }
+
+  .home-streak-spot.gold {
+    transition: none;
+  }
 }
 
 .math-text {

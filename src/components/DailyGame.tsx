@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Clock3, Flame, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock3, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
 import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BottomSheet } from "@/components/BottomSheet";
+import { GoldGleam, StreakFlame } from "@/components/Celebrations";
 import { MathText } from "@/components/MathText";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
@@ -1710,6 +1711,7 @@ function PlayerProfileSheet({
                   {recentHistory.map((result) => (
                     <li key={result.dateKey}>
                       <span aria-hidden="true" className={`profile-history-medal ${result.medal}`}>
+                        {result.medal === "gold" ? <GoldGleam /> : null}
                         {getStreakSpotLabel(result.medal)}
                       </span>
                       <span className="profile-history-date">{formatProfileHistoryDate(result.dateKey)}</span>
@@ -1799,6 +1801,7 @@ function HomeStreakStrip({
               onClick={() => onSelectDay(day.dateKey)}
               type="button"
             >
+              {day.medal === "gold" ? <GoldGleam /> : null}
               {day.medal ? getStreakSpotLabel(day.medal) : ""}
             </button>
           </div>
@@ -2287,6 +2290,7 @@ function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
     <section className="app-card score-card" aria-label="Completion score">
       <div className="card-body">
         <div className={`medal-emblem ${result.medal}`}>
+          {result.medal === "gold" ? <GoldGleam /> : null}
           {result.medal === "gold" ? <Trophy size={54} /> : <Medal size={54} />}
         </div>
 
@@ -2355,9 +2359,7 @@ function StreakScreen({ onContinue, streak }: StreakScreenProps) {
   return (
     <section className="app-card streak-card" aria-label="Current streak">
       <div className="card-body">
-        <div className="streak-burst" aria-hidden="true">
-          <Flame size={86} fill="currentColor" />
-        </div>
+        <StreakFlame />
 
         <div className="streak-copy">
           <p className="today-label">Current streak</p>
