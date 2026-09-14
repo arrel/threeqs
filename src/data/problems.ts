@@ -606,7 +606,7 @@ function makeRateProblems(context: SummerContext): Problem[] {
       prompt: `${pounds} pounds of peaches cost ${dollars(totalCost)}. At the same rate, how much do ${targetPounds} pounds cost?`,
       correctLabel: dollars(finalCost),
       distractors: [dollars(finalCost + unitPrice), dollars(finalCost - unitPrice), dollars(totalCost + targetPounds)],
-      explanation: `First find the unit rate: ${dollars(totalCost)} \\div ${pounds} = ${dollars(unitPrice)} per pound. Then multiply by ${targetPounds}: ${targetPounds} \\cdot ${dollars(unitPrice)} = ${dollars(finalCost)}.`,
+      explanation: `First find the unit rate: ${dollars(totalCost)} ÷ ${pounds} = ${dollars(unitPrice)} per pound. Then multiply by ${targetPounds}: ${targetPounds} · ${dollars(unitPrice)} = ${dollars(finalCost)}.`,
       topics: ["proportional reasoning", "unit rate"],
       vocabTerms: [{ term: "Unit Rate", definition: "A rate for exactly $1$ unit, such as the cost for $1$ pound." }],
       gradeBand: "6"
@@ -618,7 +618,7 @@ function makeRateProblems(context: SummerContext): Problem[] {
       prompt: `A cyclist rides at a constant speed of ${speed} miles per hour for ${minutes} minutes. How far does the cyclist ride?`,
       correctLabel: `${distance} miles`,
       distractors: [`${distance + 6} miles`, `${speed * minutes} miles`, `${Math.max(1, distance - 4)} miles`],
-      explanation: `${minutes} minutes is $\\frac{${minutes}}{60}$ of an hour. The distance is ${speed} \\cdot \\frac{${minutes}}{60} = ${distance}$ miles.`,
+      explanation: `${minutes} minutes is $\\frac{${minutes}}{60}$ of an hour. The distance is $${speed} \\cdot \\frac{${minutes}}{60} = ${distance}$ miles.`,
       topics: ["proportional reasoning", "speed"],
       vocabTerms: [{ term: "Constant Speed", definition: "A speed that stays the same over a period of time." }],
       gradeBand: "6-7"
@@ -675,7 +675,7 @@ function makeFractionProblems(context: SummerContext): Problem[] {
       prompt: `In a photo contest, $\\frac{1}{2}$ of the photos are cats, $\\frac{1}{4}$ are dogs, $\\frac{1}{8}$ are birds, and the remaining ${left} photos are rabbits. How many photos were entered?`,
       correctLabel: `${original}`,
       distractors: [`${original / 2}`, `${original - left}`, `${original + left}`],
-      explanation: `The listed cat, dog, and bird fractions add to $\\frac{7}{8}$, so rabbits are $\\frac{1}{8}$ of the photos. If $\\frac{1}{8}$ is ${left}, then the total is ${left} \\cdot 8 = ${original}.`,
+      explanation: `The listed cat, dog, and bird fractions add to $\\frac{7}{8}$, so rabbits are $\\frac{1}{8}$ of the photos. If $\\frac{1}{8}$ is ${left}, then the total is ${left} · 8 = ${original}.`,
       topics: ["fractions", "part-whole reasoning"],
       vocabTerms: [{ term: "Remainder", definition: "The part left after the other parts have been counted or removed." }],
       gradeBand: "7-8"
@@ -699,10 +699,10 @@ function makePercentProblems(context: SummerContext): Problem[] {
       context,
       difficulty: "easy",
       slug: "hot-dogs-percent",
-      prompt: `${percent}\\% of the ${spectators} spectators at a game bought a hot dog. How many spectators bought hot dogs?`,
+      prompt: `${percent}% of the ${spectators} spectators at a game bought a hot dog. How many spectators bought hot dogs?`,
       correctLabel: `${buyers}`,
       distractors: [`${buyers + percent}`, `${spectators - buyers}`, `${buyers / 2}`],
-      explanation: `${percent}\\% = ${percent / 100}. Multiply ${spectators} by ${percent / 100}: ${spectators} \\cdot ${percent / 100} = ${buyers}.`,
+      explanation: `${percent}% = ${percent / 100}. Multiply ${spectators} by ${percent / 100}: ${spectators} · ${percent / 100} = ${buyers}.`,
       topics: ["percent", "multiplication"],
       vocabTerms: [{ term: "Percent", definition: "A rate out of $100$." }],
       gradeBand: "6"
@@ -711,10 +711,10 @@ function makePercentProblems(context: SummerContext): Problem[] {
       context,
       difficulty: "medium",
       slug: "stacked-discount",
-      prompt: `A backpack costs ${dollars(price)}. It is ${discount}\\% off, and then a coupon takes another $10\\%$ off the sale price. What is the final price before tax?`,
+      prompt: `A backpack costs ${dollars(price)}. It is ${discount}% off, and then a coupon takes another $10\\%$ off the sale price. What is the final price before tax?`,
       correctLabel: dollars(finalPrice),
       distractors: [dollars(sale), dollars(price * 0.75), dollars(price - discount)],
-      explanation: `After the first discount, the price is ${dollars(price)} \\cdot ${(100 - discount) / 100} = ${dollars(sale)}. The coupon leaves $90\\%$ of that: ${dollars(sale)} \\cdot 0.90 = ${dollars(finalPrice)}.`,
+      explanation: `After the first discount, the price is ${dollars(price)} · ${(100 - discount) / 100} = ${dollars(sale)}. The coupon leaves $90\\%$ of that: ${dollars(sale)} · 0.90 = ${dollars(finalPrice)}.`,
       topics: ["percent", "discount"],
       vocabTerms: [{ term: "Discount", definition: "An amount subtracted from the original price." }],
       gradeBand: "6-7"
@@ -726,7 +726,7 @@ function makePercentProblems(context: SummerContext): Problem[] {
       prompt: `After a $20\\%$ raise, Priya earns ${dollars(afterRaise)} for a tutoring shift. How much did she earn before the raise?`,
       correctLabel: dollars(original),
       distractors: [dollars(afterRaise * 0.8), dollars(afterRaise - 20), dollars(original + 20)],
-      explanation: `A $20\\%$ raise means the new amount is $120\\%$ of the old amount. Divide by $1.20$: ${dollars(afterRaise)} \\div 1.20 = ${dollars(original)}.`,
+      explanation: `A $20\\%$ raise means the new amount is $120\\%$ of the old amount. Divide by $1.20$: ${dollars(afterRaise)} ÷ 1.20 = ${dollars(original)}.`,
       topics: ["percent", "reverse percent"],
       vocabTerms: [{ term: "Original Amount", definition: "The starting amount before an increase or decrease." }],
       gradeBand: "7-8"
@@ -775,7 +775,7 @@ function makeNumberTheoryProblems(context: SummerContext): Problem[] {
       prompt: `Which expression is the prime factorization of ${n}?`,
       correctLabel: primeFactorLabel(n),
       distractors: [`$2 \\cdot ${n / 2}$`, `$3 \\cdot ${n / 3}$`, `$${n}$`],
-      explanation: `Break ${n} into prime factors. Since ${n} = ${primeFactorLabel(n).replaceAll("$", "")}, the prime factorization is ${primeFactorLabel(n)}.`,
+      explanation: `Break ${n} into prime factors. Since $${n} = ${primeFactorLabel(n).replaceAll("$", "")}$, the prime factorization is ${primeFactorLabel(n)}.`,
       topics: ["number theory", "prime factorization"],
       vocabTerms: [{ term: "Prime Factorization", definition: "Writing a whole number as prime numbers multiplied together." }],
       gradeBand: "7-8"
@@ -814,7 +814,7 @@ function makeGeometryProblems(context: SummerContext): Problem[] {
       prompt: `A shape is made from a ${length} cm by ${width} cm rectangle and a right triangle with base ${triBase} cm and height ${triHeight} cm. What is the total area?`,
       correctLabel: `${compositeArea} sq cm`,
       distractors: [`${length * width} sq cm`, `${compositeArea + triBase * triHeight / 2} sq cm`, `${length * width + triBase + triHeight} sq cm`],
-      explanation: `The rectangle area is ${length} \\cdot ${width} = ${length * width}. The triangle area is $\\frac{1}{2} \\cdot ${triBase} \\cdot ${triHeight} = ${triBase * triHeight / 2}$. Add them to get ${compositeArea} sq cm.`,
+      explanation: `The rectangle area is ${length} · ${width} = ${length * width}. The triangle area is $\\frac{1}{2} \\cdot ${triBase} \\cdot ${triHeight} = ${triBase * triHeight / 2}$. Add them to get ${compositeArea} sq cm.`,
       topics: ["geometry", "area"],
       vocabTerms: [{ term: "Composite Shape", definition: "A shape made from two or more simpler shapes." }],
       gradeBand: "6-7"
@@ -863,7 +863,7 @@ function makeAlgebraProblems(context: SummerContext): Problem[] {
       prompt: `Solve for $y$: $4y - 11 = 2y + ${equationConstant}$.`,
       correctLabel: `${y}`,
       distractors: [`${y + 2}`, `${y - 2}`, `${2 * y}`],
-      explanation: `Subtract $2y$ from both sides: $2y - 11 = ${equationConstant}. Add $11$: $2y = ${equationConstant + 11}. Divide by $2$: $y = ${y}.`,
+      explanation: `Subtract $2y$ from both sides: $2y - 11 = ${equationConstant}$. Add $11$: $2y = ${equationConstant + 11}$. Divide by $2$: $y = ${y}$.`,
       topics: ["pre-algebra", "linear equations"],
       vocabTerms: [{ term: "Linear Equation", definition: "An equation whose variable is only to the first power." }],
       gradeBand: "6-7"
@@ -898,7 +898,7 @@ function makeCountingProblems(context: SummerContext): Problem[] {
       prompt: `A lunch menu has ${shirts} sandwiches, ${pants} sides, and ${shoes} drinks. How many different lunches can be made by choosing one of each?`,
       correctLabel: `${shirts * pants * shoes}`,
       distractors: [`${shirts + pants + shoes}`, `${shirts * pants}`, `${shirts * pants * shoes + 2}`],
-      explanation: `Use the counting principle: ${shirts} \\cdot ${pants} \\cdot ${shoes} = ${shirts * pants * shoes} lunches.`,
+      explanation: `Use the counting principle: ${shirts} · ${pants} · ${shoes} = ${shirts * pants * shoes} lunches.`,
       topics: ["combinatorics", "counting"],
       vocabTerms: [{ term: "Fundamental Counting Principle", definition: "A rule that says to multiply the choices for each step." }],
       gradeBand: "6"
@@ -994,7 +994,7 @@ function makeStatisticsProblems(context: SummerContext): Problem[] {
       prompt: `Find the mean of these numbers: ${data.join(", ")}.`,
       correctLabel: `${mean}`,
       distractors: [`${data[2]}`, `${data[data.length - 1] - data[0]}`, `${mean + 2}`],
-      explanation: `Add the numbers to get ${mean * data.length}. Divide by ${data.length}: ${mean * data.length} \\div ${data.length} = ${mean}.`,
+      explanation: `Add the numbers to get ${mean * data.length}. Divide by ${data.length}: ${mean * data.length} ÷ ${data.length} = ${mean}.`,
       topics: ["statistics", "mean"],
       vocabTerms: [{ term: "Mean", definition: "The average found by adding values and dividing by how many values there are." }],
       gradeBand: "6"
@@ -1006,7 +1006,7 @@ function makeStatisticsProblems(context: SummerContext): Problem[] {
       prompt: `Tests count for $60\\%$ of a grade and homework counts for $40\\%$. If Jordan averages ${testAverage} on tests and ${homeworkAverage} on homework, what is the weighted mean grade?`,
       correctLabel: `${weighted}`,
       distractors: [`${(testAverage + homeworkAverage) / 2}`, `${testAverage}`, `${homeworkAverage}`],
-      explanation: `Multiply each average by its weight: ${testAverage} \\cdot 0.60 = ${testAverage * 0.6}, and ${homeworkAverage} \\cdot 0.40 = ${homeworkAverage * 0.4}. Add them to get ${weighted}.`,
+      explanation: `Multiply each average by its weight: ${testAverage} · 0.60 = ${testAverage * 0.6}, and ${homeworkAverage} · 0.40 = ${homeworkAverage * 0.4}. Add them to get ${weighted}.`,
       topics: ["statistics", "weighted mean"],
       vocabTerms: [{ term: "Weighted Mean", definition: "An average where some values count more than others." }],
       gradeBand: "6-7"
@@ -1166,7 +1166,7 @@ function makeSequenceProblems(context: SummerContext): Problem[] {
       prompt: `An arithmetic sequence starts at ${first} and adds ${difference} each time. What is the $12$th term?`,
       correctLabel: `${term}`,
       distractors: [`${first + 12 * difference}`, `${term - difference}`, `${term + difference}`],
-      explanation: `The $12$th term is $11$ jumps after the first term: ${first} + 11 \\cdot ${difference} = ${term}.`,
+      explanation: `The $12$th term is $11$ jumps after the first term: ${first} + 11 · ${difference} = ${term}.`,
       topics: ["sequences", "arithmetic sequence"],
       vocabTerms: [{ term: "Arithmetic Sequence", definition: "A sequence that changes by the same amount each step." }],
       gradeBand: "7-8"
@@ -1192,7 +1192,7 @@ function makeMoneyProblems(context: SummerContext): Problem[] {
       prompt: `A jar has ${quarters} quarters and ${dimes} dimes. How much money is in the jar?`,
       correctLabel: dollars(totalCents / 100),
       distractors: [dollars((totalCents + 25) / 100), dollars((totalCents - 10) / 100), dollars((quarters + dimes) / 100)],
-      explanation: `${quarters} quarters are worth ${quarters} \\cdot 25 = ${25 * quarters} cents. ${dimes} dimes are worth ${dimes} \\cdot 10 = ${10 * dimes} cents. The total is ${totalCents} cents, or ${dollars(totalCents / 100)}.`,
+      explanation: `${quarters} quarters are worth ${quarters} · 25 = ${25 * quarters} cents. ${dimes} dimes are worth ${dimes} · 10 = ${10 * dimes} cents. The total is ${totalCents} cents, or ${dollars(totalCents / 100)}.`,
       topics: ["money", "coins"],
       vocabTerms: [{ term: "Cent", definition: "One hundredth of a dollar." }],
       gradeBand: "6"
@@ -1240,7 +1240,7 @@ function makeRatioProblems(context: SummerContext): Problem[] {
       prompt: `The heights of two buildings are in the ratio $3:2$. If the taller building is ${taller} feet tall, how tall is the shorter building?`,
       correctLabel: `${shorter} feet`,
       distractors: [`${taller + shorter} feet`, `${taller - shorter} feet`, `${taller * 2} feet`],
-      explanation: `The taller building represents $3$ parts, so one part is ${taller} \\div 3 = ${taller / 3}. The shorter building is $2$ parts: ${taller / 3} \\cdot 2 = ${shorter} feet.`,
+      explanation: `The taller building represents $3$ parts, so one part is ${taller} ÷ 3 = ${taller / 3}. The shorter building is $2$ parts: ${taller / 3} · 2 = ${shorter} feet.`,
       topics: ["ratios", "proportions"],
       vocabTerms: [{ term: "Ratio", definition: "A comparison of two quantities." }],
       gradeBand: "6"
@@ -1252,7 +1252,7 @@ function makeRatioProblems(context: SummerContext): Problem[] {
       prompt: `On a map, $1$ inch represents $12$ miles. Two towns are ${mapInches} inches apart on the map. How far apart are the towns in real life?`,
       correctLabel: `${miles} miles`,
       distractors: [`${mapInches + 12} miles`, `${miles / 2} miles`, `${miles + 12} miles`],
-      explanation: `Multiply the map distance by the scale: ${mapInches} \\cdot 12 = ${miles} miles.`,
+      explanation: `Multiply the map distance by the scale: ${mapInches} · 12 = ${miles} miles.`,
       topics: ["ratios", "scale"],
       vocabTerms: [{ term: "Scale", definition: "A ratio that compares a model or map to the real object or distance." }],
       gradeBand: "6-7"
@@ -1264,7 +1264,7 @@ function makeRatioProblems(context: SummerContext): Problem[] {
       prompt: `Two similar triangles have matching side lengths ${smallSide} cm and ${largeSide} cm. If another side of the smaller triangle is $7$ cm, what is the matching side of the larger triangle?`,
       correctLabel: "21 cm",
       distractors: ["14 cm", "15 cm", "35 cm"],
-      explanation: `The scale factor from the smaller triangle to the larger one is ${largeSide} \\div ${smallSide} = 3. Multiply the matching side: $7 \\cdot 3 = 21$ cm.`,
+      explanation: `The scale factor from the smaller triangle to the larger one is ${largeSide} ÷ ${smallSide} = 3. Multiply the matching side: $7 \\cdot 3 = 21$ cm.`,
       topics: ["geometry", "similar figures"],
       vocabTerms: [{ term: "Scale Factor", definition: "The number used to multiply side lengths from one similar figure to another." }],
       gradeBand: "7-8"
