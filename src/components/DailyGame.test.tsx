@@ -41,7 +41,12 @@ describe("DailyGame", () => {
     await user.type(screen.getByLabelText(/your name/i), "Ada");
     await startFromHome(user);
 
+    const questionTopbar = screen.getByLabelText(/Question 1 of 3/i).closest("header");
+
     for (const problem of dailyProblems) {
+      // The progress navigation stays mounted outside the sliding question body.
+      expect(screen.getByLabelText(/Question \d of 3/i).closest("header")).toBe(questionTopbar);
+      expect(questionTopbar?.closest(".question-transition")).toBeNull();
       await user.click(screen.getByTestId(`choice-${problem.correctChoiceId}`));
       await user.click(getButtonByText(/^check$/i));
       expect(screen.getByText(/100 pts \+ \d+ speed pts/i)).toBeInTheDocument();
