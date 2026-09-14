@@ -5,6 +5,7 @@ import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, 
 import { BottomSheet } from "@/components/BottomSheet";
 import { GoldGleam, StreakFlame } from "@/components/Celebrations";
 import { MathText } from "@/components/MathText";
+import { ScreenTransition } from "@/components/ScreenTransition";
 import { problems } from "@/data/problems";
 import { formatDateKey, getPacificDateKey } from "@/lib/date";
 import { selectDailyProblems, shuffleWithSeed } from "@/lib/daily";
@@ -1086,68 +1087,73 @@ export function DailyGame({
     navigateTo({ screen: "home" });
   }
 
+  const screenKey = mode === "quiz" || mode === "review" ? "question" : mode;
+  const screenOrder = { home: 0, ready: 1, question: 2, score: 3, streak: 4 }[screenKey];
+
   return (
     <main className="app-shell">
-      {mode === "home" ? (
-        <HomeScreen
-          dateKey={dateKey}
-          isHomeHistoryLoading={isHomeHistoryLoading}
-          isLeaderboardLoading={isLeaderboardLoading}
-          isProfileLoading={isProfileLoading}
-          isStarting={isStarting}
-          isSwitchingPlayer={isSwitchingPlayer}
-          leaderboard={leaderboard}
-          history={homeHistory}
-          isPhotoSaving={isPhotoSaving}
-          nameInput={nameInput}
-          onCancelSwitchPlayer={handleCancelSwitchPlayer}
-          onNameChange={setNameInput}
-          onLoadProfile={handleLoadPlayerProfile}
-          onPhotoChange={handleProfilePhotoChange}
-          onSelectStreakDay={handleStreakDaySelect}
-          onSwitchPlayer={handleSwitchPlayer}
-          onSubmit={handleStart}
-          photoDataUrl={profilePhoto}
-          photoError={photoError}
-          savedName={studentName}
-        />
-      ) : null}
+      <ScreenTransition className="app-card" order={screenOrder} screenKey={screenKey}>
+        {mode === "home" ? (
+          <HomeScreen
+            dateKey={dateKey}
+            isHomeHistoryLoading={isHomeHistoryLoading}
+            isLeaderboardLoading={isLeaderboardLoading}
+            isProfileLoading={isProfileLoading}
+            isStarting={isStarting}
+            isSwitchingPlayer={isSwitchingPlayer}
+            leaderboard={leaderboard}
+            history={homeHistory}
+            isPhotoSaving={isPhotoSaving}
+            nameInput={nameInput}
+            onCancelSwitchPlayer={handleCancelSwitchPlayer}
+            onNameChange={setNameInput}
+            onLoadProfile={handleLoadPlayerProfile}
+            onPhotoChange={handleProfilePhotoChange}
+            onSelectStreakDay={handleStreakDaySelect}
+            onSwitchPlayer={handleSwitchPlayer}
+            onSubmit={handleStart}
+            photoDataUrl={profilePhoto}
+            photoError={photoError}
+            savedName={studentName}
+          />
+        ) : null}
 
-      {mode === "ready" ? (
-        <ReadyScreen dateKey={dateKey} onBack={showHome} onContinue={handleReadyContinue} />
-      ) : null}
+        {mode === "ready" ? (
+          <ReadyScreen dateKey={dateKey} onBack={showHome} onContinue={handleReadyContinue} />
+        ) : null}
 
-      {mode === "quiz" || mode === "review" ? (
-        <QuestionScreen
-          attemptedChoiceIds={attemptedChoiceIds}
-          currentIndex={currentIndex}
-          isCurrentQuestionFinalized={isCurrentQuestionFinalized}
-          isReview={mode === "review"}
-          idlePromptAfterMs={idlePromptAfterMs}
-          onBack={mode === "review" ? handleBackReviewQuestion : handleBackQuestion}
-          onCheck={handleCheck}
-          onExplain={handleExplainQuestion}
-          onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
-          onSelectChoice={setSelectedChoiceId}
-          onTimerPauseChange={handleTimerPauseChange}
-          onTryAgain={handleTryAgain}
-          problem={currentProblem}
-          questionTimer={questionTimer}
-          result={checkedResult}
-          reviewResult={mode === "review" ? currentResult?.questionResults[currentIndex] ?? null : null}
-          savedResult={mode === "quiz" ? getQuestionResultAt(questionResults, currentIndex) : null}
-          selectedChoiceId={selectedChoiceId}
-          totalQuestions={dailyProblems.length}
-        />
-      ) : null}
+        {mode === "quiz" || mode === "review" ? (
+          <QuestionScreen
+            attemptedChoiceIds={attemptedChoiceIds}
+            currentIndex={currentIndex}
+            isCurrentQuestionFinalized={isCurrentQuestionFinalized}
+            isReview={mode === "review"}
+            idlePromptAfterMs={idlePromptAfterMs}
+            onBack={mode === "review" ? handleBackReviewQuestion : handleBackQuestion}
+            onCheck={handleCheck}
+            onExplain={handleExplainQuestion}
+            onNext={mode === "review" ? handleNextReviewQuestion : handleNextQuestion}
+            onSelectChoice={setSelectedChoiceId}
+            onTimerPauseChange={handleTimerPauseChange}
+            onTryAgain={handleTryAgain}
+            problem={currentProblem}
+            questionTimer={questionTimer}
+            result={checkedResult}
+            reviewResult={mode === "review" ? currentResult?.questionResults[currentIndex] ?? null : null}
+            savedResult={mode === "quiz" ? getQuestionResultAt(questionResults, currentIndex) : null}
+            selectedChoiceId={selectedChoiceId}
+            totalQuestions={dailyProblems.length}
+          />
+        ) : null}
 
-      {mode === "score" && currentResult ? (
-        <ScoreScreen isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
-      ) : null}
+        {mode === "score" && currentResult ? (
+          <ScoreScreen isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
+        ) : null}
 
-      {mode === "streak" ? (
-        <StreakScreen onContinue={handleStreakContinue} streak={streak} />
-      ) : null}
+        {mode === "streak" ? (
+          <StreakScreen onContinue={handleStreakContinue} streak={streak} />
+        ) : null}
+      </ScreenTransition>
     </main>
   );
 }
@@ -1166,7 +1172,7 @@ function ReadyScreen({ dateKey, onBack, onContinue }: ReadyScreenProps) {
   }, []);
 
   return (
-    <section className="app-card ready-card" aria-label="Pencil and paper check">
+    <section className="game-screen ready-card" aria-label="Pencil and paper check">
       <header className="ready-topbar">
         <button className="quiz-back-btn" aria-label="Back" onClick={onBack} type="button">
           <ArrowLeft size={23} />
@@ -1301,7 +1307,7 @@ function HomeScreen({
   }, []);
 
   return (
-    <section className="app-card home-card" aria-label="Three Qs home">
+    <section className="game-screen home-card" aria-label="Three Qs home">
       <div className="home-content">
         <div className="home-topbar">
           <p className="today-label home-date">{formatDateKey(dateKey)}</p>
@@ -2000,7 +2006,7 @@ function QuestionScreen({
   }
 
   return (
-    <section className="app-card quiz-card" aria-label="Question screen">
+    <section className="game-screen quiz-card" aria-label="Question screen">
       <header className="quiz-topbar">
         <button className="quiz-back-btn" aria-label="Back" onClick={onBack} type="button">
           <ArrowLeft size={23} />
@@ -2041,80 +2047,88 @@ function QuestionScreen({
         </div>
       </header>
 
-      <div className="quiz-content">
-        <div className={["quiz-prompt", promptSizeClass].filter(Boolean).join(" ")}>
-          <MathText onVocabTermSelect={openVocabSheet} text={problem.prompt} vocabTerms={vocabTerms} />
-        </div>
+      <ScreenTransition
+        className="question-transition"
+        order={currentIndex}
+        screenKey={problem.id}
+      >
+        <div className="question-body">
+          <div className="quiz-content">
+            <div className={["quiz-prompt", promptSizeClass].filter(Boolean).join(" ")}>
+              <MathText onVocabTermSelect={openVocabSheet} text={problem.prompt} vocabTerms={vocabTerms} />
+            </div>
 
-        <div className="answer-grid">
-          {orderedChoices.map((choice, index) => {
-            const isSelected = displaySelectedChoiceId === choice.id;
-            const isAttemptedWrong =
-              displayAttemptedChoiceIds.includes(choice.id) && choice.id !== problem.correctChoiceId;
-            const shouldRevealCorrectChoice = Boolean(
-              displayResult &&
-                choice.id === problem.correctChoiceId &&
-                (displayResult.solved || (displayIsFinalized && displayResult.attemptsUsed < MAX_ATTEMPTS))
-            );
+            <div className="answer-grid">
+              {orderedChoices.map((choice, index) => {
+                const isSelected = displaySelectedChoiceId === choice.id;
+                const isAttemptedWrong =
+                  displayAttemptedChoiceIds.includes(choice.id) && choice.id !== problem.correctChoiceId;
+                const shouldRevealCorrectChoice = Boolean(
+                  displayResult &&
+                    choice.id === problem.correctChoiceId &&
+                    (displayResult.solved || (displayIsFinalized && displayResult.attemptsUsed < MAX_ATTEMPTS))
+                );
 
-            return (
+                return (
+                  <button
+                    aria-pressed={isSelected || displayAttemptedChoiceIds.includes(choice.id)}
+                    className={[
+                      "answer-button",
+                      isSelected ? "selected" : "",
+                      shouldRevealCorrectChoice ? "correct" : "",
+                      isAttemptedWrong ? "wrong" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    data-testid={`choice-${choice.id}`}
+                    disabled={Boolean(displayResult) || isReview || displayAttemptedChoiceIds.includes(choice.id)}
+                    key={choice.id}
+                    onClick={() => onSelectChoice(choice.id)}
+                    type="button"
+                  >
+                    <span className="answer-letter">{String.fromCharCode(65 + index)}</span>
+                    <span className="answer-text">
+                      <MathText text={choice.label} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="quiz-footer">
+            {isViewingSavedAnswer ? (
+              <button className="primary-action check-action" onClick={onNext} type="button">
+                <ArrowRight size={19} />
+                Next
+              </button>
+            ) : (
               <button
-                aria-pressed={isSelected || displayAttemptedChoiceIds.includes(choice.id)}
-                className={[
-                  "answer-button",
-                  isSelected ? "selected" : "",
-                  shouldRevealCorrectChoice ? "correct" : "",
-                  isAttemptedWrong ? "wrong" : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                data-testid={`choice-${choice.id}`}
-                disabled={Boolean(displayResult) || isReview || displayAttemptedChoiceIds.includes(choice.id)}
-                key={choice.id}
-                onClick={() => onSelectChoice(choice.id)}
+                className="primary-action check-action"
+                disabled={!selectedChoiceId || Boolean(result)}
+                onClick={onCheck}
                 type="button"
               >
-                <span className="answer-letter">{String.fromCharCode(65 + index)}</span>
-                <span className="answer-text">
-                  <MathText text={choice.label} />
-                </span>
+                <Check size={19} />
+                Check
               </button>
-            );
-          })}
+            )}
+          </div>
+
+          {!isReview && !savedResult && result ? (
+            <FeedbackSheet
+              canTryAgain={canTryAgain}
+              isFinalQuestion={currentIndex + 1 === totalQuestions}
+              isFinalized={isCurrentQuestionFinalized}
+              onExplain={onExplain}
+              onNext={onNext}
+              onTryAgain={onTryAgain}
+              problem={problem}
+              result={result}
+            />
+          ) : null}
         </div>
-      </div>
-
-      <div className="quiz-footer">
-        {isViewingSavedAnswer ? (
-          <button className="primary-action check-action" onClick={onNext} type="button">
-            <ArrowRight size={19} />
-            Next
-          </button>
-        ) : (
-          <button
-            className="primary-action check-action"
-            disabled={!selectedChoiceId || Boolean(result)}
-            onClick={onCheck}
-            type="button"
-          >
-            <Check size={19} />
-            Check
-          </button>
-        )}
-      </div>
-
-      {!isReview && !savedResult && result ? (
-        <FeedbackSheet
-          canTryAgain={canTryAgain}
-          isFinalQuestion={currentIndex + 1 === totalQuestions}
-          isFinalized={isCurrentQuestionFinalized}
-          onExplain={onExplain}
-          onNext={onNext}
-          onTryAgain={onTryAgain}
-          problem={problem}
-          result={result}
-        />
-      ) : null}
+      </ScreenTransition>
 
       <BottomSheet
         backdropTestId="vocab-backdrop"
@@ -2287,7 +2301,7 @@ function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
   const medalLabel = getMedalLabel(result.medal);
 
   return (
-    <section className="app-card score-card" aria-label="Completion score">
+    <section className="game-screen score-card" aria-label="Completion score">
       <div className="card-body">
         <div className={`medal-emblem ${result.medal}`}>
           {result.medal === "gold" ? <GoldGleam /> : null}
@@ -2357,7 +2371,7 @@ type StreakScreenProps = {
 
 function StreakScreen({ onContinue, streak }: StreakScreenProps) {
   return (
-    <section className="app-card streak-card" aria-label="Current streak">
+    <section className="game-screen streak-card" aria-label="Current streak">
       <div className="card-body">
         <StreakFlame />
 

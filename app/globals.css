@@ -91,6 +91,30 @@ button:disabled {
   box-shadow: var(--shadow);
 }
 
+.screen-transition,
+.screen-transition-current,
+.game-screen {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.screen-transition-current {
+  outline: none;
+}
+
+.screen-transition-outgoing {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The departing screen is a noninteractive picture of its last frame. */
+.screen-transition-outgoing * {
+  animation: none !important;
+  transition: none !important;
+}
+
 .home-card,
 .score-card,
 .streak-card {
@@ -1022,8 +1046,22 @@ button:disabled {
 }
 
 .quiz-card {
-  grid-template-rows: auto 1fr auto;
+  --quiz-padding-inline: clamp(18px, 5vw, 32px);
+  grid-template-rows: auto 1fr;
   padding: 24px clamp(18px, 5vw, 32px);
+}
+
+.question-transition {
+  margin: 0 calc(-1 * var(--quiz-padding-inline)) -24px;
+  overflow: clip;
+}
+
+.question-body {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-width: 0;
+  padding: 0 var(--quiz-padding-inline) 24px;
 }
 
 .quiz-topbar {
@@ -1095,6 +1133,13 @@ button:disabled {
   height: 12px;
   border-radius: 999px;
   background: var(--line);
+  transition: flex-grow 360ms cubic-bezier(0.22, 1, 0.36, 1), background-color 240ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-segment {
+    transition: none;
+  }
 }
 
 .progress-segment.current {
