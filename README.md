@@ -38,4 +38,6 @@ pnpm test
 
 ## Edit problems
 
+Run the development server and open `http://localhost:3000/review` to scroll through the full question bank, with all answer choices, correct answers, and explanations in schedule order. This page only works in development on a localhost address; production and non-local hosts return 404.
+
 Problems live in `src/data/problems.ts`. Add original or adapted multiple-choice questions with prompt text, optional LaTeX, answer choices, explanation, difficulty, topics, grade band, and source metadata.

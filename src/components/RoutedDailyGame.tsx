@@ -43,5 +43,9 @@ export function RoutedDailyGame() {
     [currentHref, router]
   );
 
+  if (pathname === "/review") {
+    return null;
+  }
+
   return <DailyGame onRouteChange={handleRouteChange} route={pendingRoute ?? route} />;
 }
