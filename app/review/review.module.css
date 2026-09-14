@@ -1,0 +1,38 @@
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 40px 20px 64px;
+  line-height: 1.6;
+}
+
+.page a { color: var(--green-dark); }
+.header { margin-bottom: 32px; }
+.header h1 { margin-bottom: 8px; font-size: clamp(28px, 5vw, 42px); }
+.header p { color: var(--muted); margin-top: 0; }
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 24px;
+  scroll-margin-top: 20px;
+  overflow-wrap: anywhere;
+}
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; color: var(--muted); }
+.card h2 { font-size: 21px; line-height: 1.5; margin: 16px 0; }
+.choices { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.choices li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; }
+.choices .correct { background: var(--green-soft); border-color: var(--green-dark); }
+.badge { margin-left: auto; color: var(--green-dark); font-size: 14px; }
+.explanation { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+.explanation h3 { font-size: 16px; margin: 0 0 6px; }
+.topics { color: var(--muted); font-size: 14px; margin: 16px 0 0; }
+@media (max-width: 600px) {
+  .page { padding: 24px 12px; }
+  .card { padding: 18px; }
+  .card h2 { font-size: 19px; }
+}
+@media print {
+  .page { max-width: none; padding: 0; }
+  .card { break-inside: avoid; }
+}
