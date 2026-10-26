@@ -58,10 +58,13 @@ describe("DailyGame", () => {
     expect(screen.getByText("Anna’s Hummingbird")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Meet your bird/ }));
     expect(screen.getByText(/freeway speed/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Close field guide" }));
+    await user.click(screen.getByRole("button", { name: "Close bird detail" }));
 
     await user.click(getButtonByText(/^continue$/i));
     expect(screen.getByText(/current streak/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Tomorrow’s discovery" })).toBeInTheDocument();
+    expect(screen.getByText("An acorn thief dressed in blue.")).toBeInTheDocument();
+    expect(screen.queryByText("California Scrub-Jay")).not.toBeInTheDocument();
     await user.click(getButtonByText(/^continue$/i));
     expect(
       screen.getByRole("heading", { name: "ThreeQs" }),

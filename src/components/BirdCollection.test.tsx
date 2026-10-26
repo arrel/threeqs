@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { BirdCollection } from "@/components/BirdCollection";
+import { BirdCollection, NextBirdDiscovery } from "@/components/BirdCollection";
 import type { DailyResult, QuestionResult } from "@/lib/types";
 
 const result: DailyResult = {
@@ -46,13 +46,9 @@ describe("BirdCollection", () => {
       "href",
       "https://abcbirds.org/birds/annas-hummingbird/",
     );
-    fireEvent.click(screen.getByRole("button", { name: /All birds/ }));
-    expect(
-      screen.getByRole("button", { name: "Anna’s Hummingbird" }),
-    ).toBeEnabled();
-    expect(
-      screen.getAllByRole("button", { name: /Undiscovered bird/ }),
-    ).toHaveLength(11);
+    fireEvent.click(screen.getByRole("button", { name: "Close bird detail" }));
+    // Direct rewards close back to the completion screen.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
   it("resets collection content when the parent switches player keys", () => {
     const { rerender } = render(
@@ -107,5 +103,61 @@ describe("BirdCollection", () => {
       screen.getByRole("img", { name: /painted preview/ }),
     ).toHaveAttribute("src", "/birds/california-scrub-jay.webp");
     expect(screen.getByText("1 of 12 birds discovered")).toBeInTheDocument();
+  });
+  it("keeps the preview obscured but shows earned artwork clearly", () => {
+    const { rerender } = render(
+      <BirdCollection prominent history={[]} todayKey="2026-10-25" />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Preview your next bird discovery" }),
+    ).toHaveClass("bird-mystery");
+    rerender(
+      <BirdCollection prominent history={[result]} todayKey="2026-10-25" />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Meet Anna’s Hummingbird" }),
+    ).not.toHaveClass("bird-mystery");
+  });
+
+  it("teases the next unearned bird and stops when the collection is complete", () => {
+    const { rerender } = render(
+      <NextBirdDiscovery history={[result]} todayKey="2026-10-25" />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Tomorrow’s discovery" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("img")).toHaveAttribute(
+      "src",
+      "/birds/california-scrub-jay.webp",
+    );
+    expect(screen.queryByText("California Scrub-Jay")).not.toBeInTheDocument();
+    const complete = Array.from({ length: 12 }, (_, i) => ({
+      ...result,
+      dateKey: `2026-11-${String(i + 1).padStart(2, "0")}`,
+    }));
+    rerender(<NextBirdDiscovery history={complete} todayKey="2026-11-12" />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText(/field guide is complete/)).toBeInTheDocument();
+  });
+
+  it("opens bird details outside the game card and restores focus on Escape", () => {
+    render(
+      <BirdCollection prominent history={[result]} todayKey="2026-10-25" />,
+    );
+    const trigger = screen.getByRole("button", {
+      name: "Meet Anna’s Hummingbird",
+    });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Anna’s Hummingbird" });
+    expect(dialog.parentElement).toBe(document.body);
+    expect(
+      screen.getByRole("button", { name: "Close bird detail" }),
+    ).toHaveFocus();
+    expect(document.body.style.overflow).toBe("hidden");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(document.body.style.overflow).not.toBe("hidden");
   });
 });

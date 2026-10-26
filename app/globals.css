@@ -2681,3 +2681,32 @@ button:disabled {
 .bird-home .home-form { margin: 18px 0; }
 .home-form.has-saved-player .home-play-action { grid-row: 1; }
 .home-form.has-saved-player .home-discovery-note { grid-row: 2; }
+
+/* Unearned birds stay mysterious everywhere, including on hover. */
+.bird-mystery { position: relative; overflow: hidden; isolation: isolate; background: #c7c9ae; }
+.bird-mystery > img, .bird-home-art.bird-mystery:hover > img { filter: blur(20px) saturate(.65) brightness(.85); transform: scale(1.12); user-select: none; pointer-events: none; }
+.bird-mystery::after { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, #ece6c92b, #334f3540); pointer-events: none; z-index: 0; }
+.bird-mystery-mark { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid #fff8; border-radius: 50%; background: #fffdf034; color: #fffdf6; font-family: Georgia, serif; font-size: 44px; z-index: 1; }
+.bird-mystery .bird-home-tag, .bird-mystery .bird-home-number { z-index: 1; }
+.bird-tile.locked img { filter: blur(12px) grayscale(.7) brightness(.8); opacity: .45; }
+.bird-home-thumbnails .uncollected { filter: blur(5px) grayscale(1); }
+.bird-next-discovery { width: 100%; text-align: center; }
+.bird-next-discovery h2 { margin: 10px 0 22px; font-family: Georgia, serif; font-size: clamp(28px, 7vw, 36px); font-weight: 400; color: #29483b; line-height: 1.15; }
+.bird-next-art { border-radius: 18px; }
+.bird-next-art img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
+.bird-next-clue { font-size: 19px; line-height: 1.5; color: #36513e; margin: 22px 0 10px; }
+.bird-next-invitation, .bird-collection-finale { font-size: 14px; line-height: 1.5; color: #69745e; }
+.streak-card:has(.bird-next-discovery) { background: #fffdf6; }
+.streak-card:has(.bird-next-discovery) .completion-streak-flame { display: none; }
+.streak-card:has(.bird-next-discovery) .streak-copy { display: flex; align-items: baseline; justify-content: center; gap: 8px; order: 2; margin-top: 10px; }
+.streak-card:has(.bird-next-discovery) .streak-copy h1 { font-size: 25px; text-shadow: none; color: #385c44; }
+.streak-card:has(.bird-next-discovery) .streak-copy p { font-size: 12px; margin: 0; }
+.bird-lightbox { position: fixed; inset: 0; z-index: 1000; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; background: #fffdf6; color: #29483b; }
+.bird-lightbox-header { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 16px clamp(20px, 4vw, 64px); background: #fffdf6f5; border-bottom: 1px solid #e3e3d5; font-size: 14px; font-weight: 700; }
+.bird-lightbox-header button { display: grid; place-items: center; min-width: 44px; min-height: 44px; border-radius: 50%; border: 1px solid #d9dfd0; color: #29483b; background: transparent; }
+.bird-lightbox-content { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr); align-items: center; gap: clamp(24px, 4vw, 64px); max-width: 1800px; min-height: calc(100dvh - 78px); padding: clamp(20px, 4vw, 64px); margin: 0 auto; }
+.bird-lightbox-image img { display: block; width: 100%; height: auto; max-height: calc(100dvh - 130px); object-fit: contain; border-radius: 16px; }
+.bird-lightbox-story h1 { font-family: Georgia, serif; font-size: clamp(32px, 4vw, 60px); font-weight: 400; line-height: 1.06; letter-spacing: -1.4px; margin: 12px 0 24px; }
+.bird-lightbox-story .bird-fact { font-size: clamp(17px, 1.5vw, 23px); }
+.bird-lightbox :focus-visible { outline: 3px solid #56826a; outline-offset: 4px; }
+@media (max-width: 850px) { .bird-lightbox-content { grid-template-columns: 1fr; align-content: start; min-height: 0; gap: 24px; } .bird-lightbox-image img { max-height: 62dvh; } }

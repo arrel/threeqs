@@ -59,3 +59,8 @@ when updating content. Artwork in `public/birds` is generated natural-history pa
 optimized WebP images. The homepage leads with the next bird (or today’s earned
 bird), its clue or fact, and collection progress. Quiz history remains below the
 main discovery flow. Generation prompts are recorded in `docs/bird-art-prompts.json`.
+
+Unearned bird previews are blurred on home and in the album. The completion
+sequence teases the next unearned bird with obscured artwork and a clue; a full
+album shows a completion message instead. Tapping an earned bird opens a
+full-screen artwork viewer with keyboard dismissal and focus restoration.

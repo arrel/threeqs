@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ArrowRight, Bird as BirdIcon, LockKeyhole } from "lucide-react";
+import { BirdDetailModal } from "@/components/BirdDetailModal";
 import { BottomSheet } from "@/components/BottomSheet";
 import { birds, type Bird } from "@/data/birds";
 import { getBirdCollection } from "@/lib/birds";
@@ -46,7 +47,6 @@ export function BirdCollection({
           type="button"
           onClick={() => {
             setSelected(reward);
-            setOpen(true);
           }}
         >
           <img
@@ -77,12 +77,12 @@ export function BirdCollection({
             </h2>
           </div>
           <button
-            className="bird-home-art"
+            className={`bird-home-art ${isFeaturedEarned ? "" : "bird-mystery"}`}
             type="button"
             disabled={isLoading}
             onClick={() => {
-              setSelected(isFeaturedEarned ? featured : null);
-              setOpen(true);
+              if (isFeaturedEarned) setSelected(featured);
+              else openAlbum();
             }}
             aria-label={
               isFeaturedEarned
@@ -101,6 +101,11 @@ export function BirdCollection({
               height="1024"
               fetchPriority="high"
             />
+            {!isFeaturedEarned ? (
+              <span className="bird-mystery-mark" aria-hidden="true">
+                ?
+              </span>
+            ) : null}
             <span className="bird-home-tag">
               {isLoading
                 ? "Loading your field guide"
@@ -214,154 +219,153 @@ export function BirdCollection({
         className="bird-album-sheet"
       >
         <div className="bird-album-content">
-          {selected ? (
-            <>
-              <button
-                className="bird-back"
-                type="button"
-                onClick={() => setSelected(null)}
-              >
-                ← All birds
-              </button>
-              <BirdDetail bird={selected} />
-            </>
+          <p className="bird-album-kicker">SANTA BARBARA · COLLECTION 01</p>
+          <h3 className="bird-album-heading">A little closer to the wild.</h3>
+          <p className="bird-album-intro">
+            Finish all three questions to discover a bird. Any score counts.
+            Miss a day? Your birds stay.
+          </p>
+          <div className="bird-progress">
+            <span>
+              {collection.collected.length} / {birds.length} discovered
+            </span>
+            <progress
+              aria-label="Birds discovered"
+              value={collection.collected.length}
+              max={birds.length}
+            />
+          </div>
+          {!next ? (
+            <p className="bird-complete">
+              Collection complete! Tap any bird to revisit its story.
+            </p>
           ) : (
-            <>
-              <p className="bird-album-kicker">SANTA BARBARA · COLLECTION 01</p>
-              <h3 className="bird-album-heading">
-                A little closer to the wild.
-              </h3>
-              <p className="bird-album-intro">
-                Finish all three questions to discover a bird. Any score counts.
-                Miss a day? Your birds stay.
-              </p>
-              <div className="bird-progress">
-                <span>
-                  {collection.collected.length} / {birds.length} discovered
-                </span>
-                <progress
-                  aria-label="Birds discovered"
-                  value={collection.collected.length}
-                  max={birds.length}
-                />
-              </div>
-              {!next ? (
-                <p className="bird-complete">
-                  Collection complete! Tap any bird to revisit its story.
-                </p>
-              ) : (
-                <p className="bird-next">
-                  <strong>
-                    {collection.completedToday
-                      ? "Next time"
-                      : "Your next discovery"}
-                  </strong>
-                  <br />
-                  {next.clue}
-                </p>
-              )}
-              {(
-                ["Neighborhood", "Oak woodland", "Coast & wetlands"] as const
-              ).map((habitat) => (
-                <section
-                  className="bird-habitat"
-                  key={habitat}
-                  aria-label={habitat}
-                >
-                  <h3>{habitat}</h3>
-                  <div className="bird-grid">
-                    {birds
-                      .filter((bird) => bird.habitat === habitat)
-                      .map((bird) => {
-                        const unlocked = collection.collected.includes(bird);
-                        return (
-                          <button
-                            key={bird.id}
-                            className={`bird-tile ${unlocked ? "discovered" : "locked"}`}
-                            disabled={!unlocked}
-                            onClick={() => setSelected(bird)}
-                            type="button"
-                            aria-label={
-                              unlocked
-                                ? bird.name
-                                : `Undiscovered bird ${birds.indexOf(bird) + 1}`
-                            }
-                          >
-                            <img
-                              src={`/birds/${bird.id}.webp`}
-                              alt=""
-                              width="160"
-                              height="110"
-                              loading="lazy"
-                            />
-                            <span>
-                              {unlocked ? (
-                                bird.name
-                              ) : (
-                                <>
-                                  <LockKeyhole size={12} /> Undiscovered
-                                </>
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })}
-                  </div>
-                </section>
-              ))}
-              <p className="bird-sources">
-                Local species:{" "}
-                <a
-                  href="https://santabarbaraaudubon.org/wp-content/uploads/SBAS-Local-Bird-Checklist.pdf"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Santa Barbara Audubon
-                </a>{" "}
-                and the{" "}
-                <a
-                  href="https://sbbotanicgarden.org/wp-content/uploads/2022/05/SBBotanicGarden-Bird-List-Excel-62nd_NewBrand.pdf"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Botanic Garden
-                </a>
-                . AI-painted illustrations; real birds vary with age and sex.
-              </p>
-            </>
+            <p className="bird-next">
+              <strong>
+                {collection.completedToday
+                  ? "Next time"
+                  : "Your next discovery"}
+              </strong>
+              <br />
+              {next.clue}
+            </p>
           )}
+          {(["Neighborhood", "Oak woodland", "Coast & wetlands"] as const).map(
+            (habitat) => (
+              <section
+                className="bird-habitat"
+                key={habitat}
+                aria-label={habitat}
+              >
+                <h3>{habitat}</h3>
+                <div className="bird-grid">
+                  {birds
+                    .filter((bird) => bird.habitat === habitat)
+                    .map((bird) => {
+                      const unlocked = collection.collected.includes(bird);
+                      return (
+                        <button
+                          key={bird.id}
+                          className={`bird-tile ${unlocked ? "discovered" : "locked"}`}
+                          disabled={!unlocked}
+                          onClick={() => setSelected(bird)}
+                          type="button"
+                          aria-label={
+                            unlocked
+                              ? bird.name
+                              : `Undiscovered bird ${birds.indexOf(bird) + 1}`
+                          }
+                        >
+                          <img
+                            src={`/birds/${bird.id}.webp`}
+                            alt=""
+                            width="160"
+                            height="110"
+                            loading="lazy"
+                          />
+                          <span>
+                            {unlocked ? (
+                              bird.name
+                            ) : (
+                              <>
+                                <LockKeyhole size={12} /> Undiscovered
+                              </>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                </div>
+              </section>
+            ),
+          )}
+          <p className="bird-sources">
+            Local species:{" "}
+            <a
+              href="https://santabarbaraaudubon.org/wp-content/uploads/SBAS-Local-Bird-Checklist.pdf"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Santa Barbara Audubon
+            </a>{" "}
+            and the{" "}
+            <a
+              href="https://sbbotanicgarden.org/wp-content/uploads/2022/05/SBBotanicGarden-Bird-List-Excel-62nd_NewBrand.pdf"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Botanic Garden
+            </a>
+            . AI-painted illustrations; real birds vary with age and sex.
+          </p>
         </div>
       </BottomSheet>
+      {selected ? (
+        <BirdDetailModal bird={selected} onDismiss={() => setSelected(null)} />
+      ) : null}
     </div>
   );
 }
 
-function BirdDetail({ bird }: { bird: Bird }) {
-  return (
-    <article className="bird-detail">
-      <img
-        src={`/birds/${bird.id}.webp`}
-        alt={`Natural-history painting of ${bird.name}`}
-        width="320"
-        height="220"
-      />
-      <p className="bird-album-kicker">
-        {bird.habitat} · #{String(birds.indexOf(bird) + 1).padStart(2, "0")}
+export function NextBirdDiscovery({
+  history,
+  todayKey,
+}: {
+  history: DailyResult[];
+  todayKey: string;
+}) {
+  const { collected, nextBird, completedToday } = getBirdCollection(
+    history,
+    todayKey,
+  );
+  if (!collected.length) return null;
+  if (!nextBird)
+    return (
+      <p className="bird-collection-finale">
+        All 12 birds discovered. Your field guide is complete!
       </p>
-      <h3>{bird.name}</h3>
-      <p className="bird-fact">{bird.fact}</p>
-      <div className="bird-spotting">
-        <strong>Out in the wild</strong>
-        <p>{bird.spottingTip}</p>
+    );
+  return (
+    <section className="bird-next-discovery" aria-label="Next bird mystery">
+      <p className="bird-album-kicker">ONE MORE REASON TO COME BACK</p>
+      <h2>{completedToday ? "Tomorrow’s discovery" : "Your next discovery"}</h2>
+      <div className="bird-mystery bird-next-art">
+        <img
+          src={`/birds/${nextBird.id}.webp`}
+          alt="An obscured preview of the next mystery bird"
+          width="1200"
+          height="800"
+        />
+        <span className="bird-mystery-mark" aria-hidden="true">
+          ?
+        </span>
       </div>
-      <a
-        className="bird-source"
-        href={bird.source}
-        target="_blank"
-        rel="noreferrer"
-      >
-        Read more & see real photos ↗
-      </a>
-    </article>
+      <p className="bird-next-clue">{nextBird.clue}</p>
+      <p className="bird-next-invitation">
+        {completedToday
+          ? "Come back tomorrow to find out who it is."
+          : "Finish your next daily quiz to find out who it is."}
+      </p>
+    </section>
   );
 }

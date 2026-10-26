@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ArrowRight, Check, Clock3, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
 import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BirdCollection } from "@/components/BirdCollection";
+import { BirdCollection, NextBirdDiscovery } from "@/components/BirdCollection";
 import { BottomSheet } from "@/components/BottomSheet";
 import { GoldGleam, StreakFlame } from "@/components/Celebrations";
 import { MathText } from "@/components/MathText";
@@ -1152,7 +1152,7 @@ export function DailyGame({
         ) : null}
 
         {mode === "streak" ? (
-          <StreakScreen onContinue={handleStreakContinue} streak={streak} />
+          <StreakScreen history={history} todayKey={todayDateKey} onContinue={handleStreakContinue} streak={streak} />
         ) : null}
       </ScreenTransition>
     </main>
@@ -2371,21 +2371,24 @@ function getPromptSizeClass(prompt: string): string {
 }
 
 type StreakScreenProps = {
+  history: DailyResult[];
+  todayKey: string;
   onContinue(): void;
   streak: number;
 };
 
-function StreakScreen({ onContinue, streak }: StreakScreenProps) {
+function StreakScreen({ history, todayKey, onContinue, streak }: StreakScreenProps) {
   return (
     <section className="game-screen streak-card" aria-label="Current streak">
       <div className="card-body">
-        <StreakFlame />
+        <div className="completion-streak-flame"><StreakFlame /></div>
 
         <div className="streak-copy">
           <p className="today-label">Current streak</p>
           <h1>{streak}</h1>
           <p>{streak === 1 ? "day" : "days"} in a row</p>
         </div>
+        <NextBirdDiscovery history={history} todayKey={todayKey} />
       </div>
 
       <button className="primary-action" onClick={onContinue} type="button">
