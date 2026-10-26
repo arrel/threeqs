@@ -2204,3 +2204,232 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* The field guide uses quiet coastal colors, with original local SVG artwork. */
+.bird-collection {
+  width: 100%;
+  text-align: left;
+}
+.bird-album-trigger,
+.bird-reward {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #cedaca;
+  border-radius: 16px;
+  background: #f2f5eb;
+  color: #29493f;
+  text-align: left;
+  cursor: pointer;
+}
+.bird-album-trigger > span,
+.bird-reward > span {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+}
+.bird-album-trigger strong {
+  font-size: 14px;
+}
+.bird-album-trigger small,
+.bird-reward small {
+  font-size: 12px;
+  color: #52685a;
+}
+.bird-album-trigger:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.bird-teaser {
+  margin: 8px 4px 0;
+  color: #57655c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.bird-reward img {
+  width: 94px;
+  height: auto;
+  border-radius: 10px;
+}
+.bird-reward strong {
+  font-size: 17px;
+  line-height: 1.25;
+}
+.bird-reward span span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.bird-album-sheet {
+  max-height: 88%;
+  background: #fffdf6;
+}
+.bird-album-content {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 0 22px 28px;
+  text-align: left;
+}
+.bird-album-kicker {
+  color: #637561;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  margin: 18px 0 8px;
+  text-transform: uppercase;
+}
+.bird-album-heading {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 29px;
+  color: #284b3e;
+  line-height: 1.15;
+  margin: 0 0 12px;
+}
+.bird-album-intro,
+.bird-next,
+.bird-spotting p {
+  color: #566356;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.bird-progress {
+  margin: 20px 0;
+  display: grid;
+  gap: 8px;
+  color: #365743;
+  font-size: 12px;
+  font-weight: 700;
+}
+.bird-progress progress {
+  width: 100%;
+  height: 7px;
+  accent-color: #527859;
+}
+.bird-next,
+.bird-complete {
+  border-radius: 12px;
+  padding: 14px;
+  background: #edf1e3;
+}
+.bird-habitat h3 {
+  margin: 24px 0 12px;
+  font-size: 16px;
+  color: #294b3c;
+}
+.bird-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.bird-tile {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #dce1d3;
+  background: #fffef8;
+  border-radius: 13px;
+  text-align: left;
+  color: #294b3c;
+  cursor: pointer;
+}
+.bird-tile img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0;
+}
+.bird-tile > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.bird-tile.locked {
+  cursor: default;
+  color: #738071;
+}
+.bird-tile.locked img {
+  filter: grayscale(1) brightness(0.35);
+  opacity: 0.22;
+}
+.bird-back {
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: #42624d;
+  cursor: pointer;
+  font-weight: 700;
+}
+.bird-detail > img {
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+  display: block;
+}
+.bird-detail h3 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 29px;
+  line-height: 1.15;
+  color: #284b3e;
+  margin: 8px 0 16px;
+}
+.bird-fact {
+  font-size: 17px;
+  line-height: 1.6;
+  color: #364b40;
+}
+.bird-spotting {
+  padding: 16px;
+  background: #edf1e3;
+  border-radius: 12px;
+  margin: 18px 0;
+}
+.bird-spotting strong {
+  color: #365743;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.bird-spotting p {
+  margin: 8px 0 0;
+}
+.bird-source,
+.bird-sources {
+  color: #5f7160;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.bird-sources {
+  margin-top: 24px;
+}
+.bird-sources a,
+.bird-source {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bird-collection button:focus-visible,
+.bird-collection a:focus-visible {
+  outline: 3px solid #56826a;
+  outline-offset: 3px;
+}
+.score-card:has(.bird-reward) .card-body {
+  gap: 16px;
+}
+.score-card:has(.bird-reward) .medal-emblem {
+  width: 88px;
+  height: 88px;
+}
+.bird-album-sheet .bottom-sheet-title {
+  font-size: 22px;
+}
+.bird-detail > img {
+  max-height: 240px;
+  object-fit: contain;
+  background: #edf0e3;
+}

@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ArrowRight, Check, Clock3, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
 import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BirdCollection } from "@/components/BirdCollection";
 import { BottomSheet } from "@/components/BottomSheet";
 import { GoldGleam, StreakFlame } from "@/components/Celebrations";
 import { MathText } from "@/components/MathText";
@@ -1147,7 +1148,7 @@ export function DailyGame({
         ) : null}
 
         {mode === "score" && currentResult ? (
-          <ScoreScreen isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
+          <ScoreScreen history={history} todayKey={todayDateKey} isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
         ) : null}
 
         {mode === "streak" ? (
@@ -1351,6 +1352,7 @@ function HomeScreen({
         <div aria-hidden="true" />
 
         <form className="home-form" onSubmit={onSubmit}>
+          <BirdCollection key={savedName} history={savedName ? history : []} todayKey={dateKey} isLoading={isHomeHistoryLoading} />
           <div className="name-field">
             <span className="name-field-label" id={nameLabelId}>
               {savedName ? "Player" : "Your Name"}
@@ -2292,12 +2294,14 @@ function FeedbackSheet({
 }
 
 type ScoreScreenProps = {
+  history: DailyResult[];
+  todayKey: string;
   isSaving: boolean;
   onContinue(): void;
   result: DailyResult;
 };
 
-function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
+function ScoreScreen({ history, todayKey, isSaving, onContinue, result }: ScoreScreenProps) {
   const medalLabel = getMedalLabel(result.medal);
 
   return (
@@ -2315,6 +2319,8 @@ function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
             You scored <strong>{result.totalScore}</strong> out of {MAX_DAILY_SCORE} points.
           </p>
         </div>
+
+        <BirdCollection history={[...history.filter((entry) => entry.dateKey !== result.dateKey), result]} todayKey={todayKey} rewardDate={result.dateKey} />
 
         <ul className="question-breakdown">
           {result.questionResults.map((question) => (

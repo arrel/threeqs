@@ -41,3 +41,18 @@ pnpm test
 Run the development server and open `http://localhost:3000/review` to scroll through the full question bank, with all answer choices, correct answers, and explanations in schedule order. This page only works in development on a localhost address; production and non-local hosts return 404.
 
 Problems live in `src/data/problems.ts`. Add original or adapted multiple-choice questions with prompt text, optional LaTeX, answer choices, explanation, difficulty, topics, grade band, and source metadata.
+
+## Santa Barbara field guide
+
+Completing all three questions earns one illustrated local bird, regardless of
+score. The first collection contains 12 species, with a sourced fact and a
+spotting tip for each. Open the field guide from home or tap the earned bird on
+the results screen. Photo uploads are not part of the collection.
+
+Progress is derived from the active player's existing saved quiz history; it
+uses the same local persistence and remote history as the game. Unique completed
+quiz dates from October 25, 2026 onward count, so old history does not fill the
+album immediately. Replaying a date never adds another bird, missed days never
+remove birds, and future/partial results do not count. After 12 qualifying dates,
+the complete album stays available. Keep the order in `src/data/birds.ts` stable
+when updating content. Artwork in `public/birds` is original, stylized SVG.
