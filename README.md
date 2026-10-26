@@ -55,4 +55,7 @@ quiz dates from October 25, 2026 onward count, so old history does not fill the
 album immediately. Replaying a date never adds another bird, missed days never
 remove birds, and future/partial results do not count. After 12 qualifying dates,
 the complete album stays available. Keep the order in `src/data/birds.ts` stable
-when updating content. Artwork in `public/birds` is original, stylized SVG.
+when updating content. Artwork in `public/birds` is generated natural-history painting, delivered as
+optimized WebP images. The homepage leads with the next bird (or today’s earned
+bird), its clue or fact, and collection progress. Quiz history remains below the
+main discovery flow. Generation prompts are recorded in `docs/bird-art-prompts.json`.

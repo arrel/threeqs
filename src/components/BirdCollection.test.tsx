@@ -66,4 +66,46 @@ describe("BirdCollection", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("0 of 12 birds discovered")).toBeInTheDocument();
   });
+  it("leads with a bird preview without granting it before quiz completion", () => {
+    render(<BirdCollection prominent history={[]} todayKey="2026-10-25" />);
+    expect(
+      screen.getByRole("heading", { name: "A new bird, every day." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /painted preview/ }),
+    ).toHaveAttribute("src", "/birds/annas-hummingbird.webp");
+    expect(screen.getByText("0 of 12 birds discovered")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview your next bird discovery" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Undiscovered bird 1" }),
+    ).toBeDisabled();
+  });
+
+  it("celebrates today's earned bird on home and previews the next clue", () => {
+    render(
+      <BirdCollection prominent history={[result]} todayKey="2026-10-25" />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Anna’s Hummingbird" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("An acorn thief dressed in blue."),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Meet Anna’s Hummingbird" }),
+    );
+    expect(screen.getByRole("link", { name: /Read more/ })).toBeInTheDocument();
+  });
+
+  it("shows the next unearned bird on a later day without losing progress", () => {
+    render(
+      <BirdCollection prominent history={[result]} todayKey="2026-10-27" />,
+    );
+    expect(
+      screen.getByRole("img", { name: /painted preview/ }),
+    ).toHaveAttribute("src", "/birds/california-scrub-jay.webp");
+    expect(screen.getByText("1 of 12 birds discovered")).toBeInTheDocument();
+  });
 });

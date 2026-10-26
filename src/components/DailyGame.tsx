@@ -1307,52 +1307,8 @@ function HomeScreen({
     setIsProfileOpen(false);
   }, []);
 
-  return (
-    <section className="game-screen home-card" aria-label="Three Qs home">
-      <div className="home-content">
-        <div className="home-topbar">
-          <p className="today-label home-date">{formatDateKey(dateKey)}</p>
-          <button
-            aria-label={
-              leaderboardPosition
-                ? `Open leaderboard, you are #${leaderboardPosition}`
-                : "Open leaderboard"
-            }
-            className="leaderboard-trigger"
-            onClick={() => setIsLeaderboardOpen(true)}
-            type="button"
-          >
-            <Trophy size={17} />
-            <span>{leaderboardPosition ? `#${leaderboardPosition}` : "Leaderboard"}</span>
-          </button>
-        </div>
-
-        <div aria-hidden="true" />
-
-        <div className="home-copy">
-          <h1 className="home-wordmark">
-            Three<span className="home-wordmark-qs">Qs</span>
-          </h1>
-          <p>Your daily math superbowl challenge</p>
-        </div>
-
-        <div aria-hidden="true" />
-
-        {savedName ? (
-          <HomeStreakStrip
-            days={streakDays.days}
-            hasActiveDay={streakDays.hasActiveDay}
-            isLoading={isHomeHistoryLoading}
-            onSelectDay={onSelectStreakDay}
-          />
-        ) : (
-          <div className="home-streak-blank" aria-hidden="true" />
-        )}
-
-        <div aria-hidden="true" />
-
-        <form className="home-form" onSubmit={onSubmit}>
-          <BirdCollection key={savedName} history={savedName ? history : []} todayKey={dateKey} isLoading={isHomeHistoryLoading} />
+  const discoveryAction = (
+        <form className={`home-form ${savedName ? "has-saved-player" : ""}`} onSubmit={onSubmit}>
           <div className="name-field">
             <span className="name-field-label" id={nameLabelId}>
               {savedName ? "Player" : "Your Name"}
@@ -1396,7 +1352,51 @@ function HomeScreen({
             <Play size={19} fill="currentColor" />
             {primaryActionLabel}
           </button>
+          <p className="home-discovery-note">Three questions. Any score. A bird to keep.</p>
         </form>
+  );
+
+  return (
+    <section className="game-screen home-card" aria-label="Three Qs home">
+      <div className="home-content">
+        <div className="home-topbar">
+          <h1 className="home-wordmark">Three<span className="home-wordmark-qs">Qs</span></h1>
+          <button
+            aria-label={
+              leaderboardPosition
+                ? `Open leaderboard, you are #${leaderboardPosition}`
+                : "Open leaderboard"
+            }
+            className="leaderboard-trigger"
+            onClick={() => setIsLeaderboardOpen(true)}
+            type="button"
+          >
+            <Trophy size={17} />
+            <span>{leaderboardPosition ? `#${leaderboardPosition}` : "Leaderboard"}</span>
+          </button>
+        </div>
+
+        <BirdCollection
+          key={savedName}
+          history={savedName ? history : []}
+          todayKey={dateKey}
+          isLoading={isHomeHistoryLoading}
+          prominent
+          action={discoveryAction}
+        />
+
+
+
+        {savedName ? (
+          <div className="home-history">
+            <HomeStreakStrip
+              days={streakDays.days}
+              hasActiveDay={streakDays.hasActiveDay}
+              isLoading={isHomeHistoryLoading}
+              onSelectDay={onSelectStreakDay}
+            />
+          </div>
+        ) : null}
       </div>
 
       <BottomSheet

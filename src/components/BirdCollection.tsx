@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowRight, Bird as BirdIcon, LockKeyhole } from "lucide-react";
 import { BottomSheet } from "@/components/BottomSheet";
 import { birds, type Bird } from "@/data/birds";
@@ -12,17 +12,29 @@ export function BirdCollection({
   todayKey,
   rewardDate,
   isLoading = false,
+  prominent = false,
+  action,
 }: {
   history: DailyResult[];
   todayKey: string;
   rewardDate?: string;
   isLoading?: boolean;
+  prominent?: boolean;
+  action?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Bird | null>(null);
   const collection = getBirdCollection(history, todayKey);
   const reward = rewardDate ? collection.rewardForDate(rewardDate) : undefined;
   const next = collection.nextBird;
+  const earnedToday = collection.rewardForDate(todayKey);
+  const featured =
+    earnedToday ?? next ?? collection.collected.at(-1) ?? birds[0];
+  const isFeaturedEarned = collection.collected.includes(featured);
+  const openAlbum = () => {
+    setSelected(null);
+    setOpen(true);
+  };
 
   if (rewardDate && !reward) return null;
 
@@ -37,7 +49,12 @@ export function BirdCollection({
             setOpen(true);
           }}
         >
-          <img src={`/birds/${reward.id}.svg`} alt="" width="104" height="72" />
+          <img
+            src={`/birds/${reward.id}.webp`}
+            alt=""
+            width="104"
+            height="72"
+          />
           <span>
             <small>Added to your field guide</small>
             <strong>{reward.name}</strong>
@@ -47,7 +64,110 @@ export function BirdCollection({
           </span>
         </button>
       ) : null}
-      {!rewardDate ? (
+      {!rewardDate && prominent ? (
+        <section className="bird-home" aria-label="Your daily bird discovery">
+          <div className="bird-home-heading">
+            <p className="bird-album-kicker">SANTA BARBARA FIELD NOTES</p>
+            <h2>
+              {!next
+                ? "A field guide of your own."
+                : earnedToday
+                  ? "Look who you discovered."
+                  : "A new bird, every day."}
+            </h2>
+          </div>
+          <button
+            className="bird-home-art"
+            type="button"
+            disabled={isLoading}
+            onClick={() => {
+              setSelected(isFeaturedEarned ? featured : null);
+              setOpen(true);
+            }}
+            aria-label={
+              isFeaturedEarned
+                ? `Meet ${featured.name}`
+                : "Preview your next bird discovery"
+            }
+          >
+            <img
+              src={`/birds/${featured.id}.webp`}
+              alt={
+                isFeaturedEarned
+                  ? `Painting of ${featured.name}`
+                  : "A painted preview of your next Santa Barbara bird"
+              }
+              width="1536"
+              height="1024"
+              fetchPriority="high"
+            />
+            <span className="bird-home-tag">
+              {isLoading
+                ? "Loading your field guide"
+                : isFeaturedEarned
+                  ? "IN YOUR COLLECTION"
+                  : "WAITING TO BE DISCOVERED"}
+            </span>
+            <span className="bird-home-number">
+              {String(birds.indexOf(featured) + 1).padStart(2, "0")} / 12
+            </span>
+          </button>
+          <div className="bird-home-story">
+            <span className="bird-home-habitat">{featured.habitat}</span>
+            <h3>{isFeaturedEarned ? featured.name : "Your next discovery"}</h3>
+            <p>{isFeaturedEarned ? featured.fact : featured.clue}</p>
+            {!isFeaturedEarned ? (
+              <span className="bird-home-invitation">
+                Finish today’s quiz to add this bird to your field guide.
+              </span>
+            ) : null}
+          </div>
+          {action}
+          <button
+            className="bird-home-album"
+            disabled={isLoading}
+            type="button"
+            onClick={openAlbum}
+          >
+            <span className="bird-home-thumbnails" aria-hidden="true">
+              {(collection.collected.length
+                ? collection.collected.slice(-3)
+                : birds.slice(0, 3)
+              ).map((bird) => (
+                <img
+                  className={
+                    collection.collected.includes(bird) ? "" : "uncollected"
+                  }
+                  src={`/birds/${bird.id}.webp`}
+                  alt=""
+                  width="48"
+                  height="48"
+                  key={bird.id}
+                />
+              ))}
+            </span>
+            <span>
+              <strong>Your field guide</strong>
+              <small>
+                {isLoading
+                  ? "Loading your birds…"
+                  : `${collection.collected.length} of ${birds.length} birds discovered`}
+              </small>
+            </span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
+          {earnedToday && next ? (
+            <p className="bird-home-tomorrow">
+              <strong>Next time:</strong> {next.clue}
+            </p>
+          ) : !next ? (
+            <p className="bird-home-tomorrow">
+              All 12 birds are yours. Revisit their stories anytime.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+      {!rewardDate && !prominent ? (
         <button
           className="bird-album-trigger"
           disabled={isLoading}
@@ -69,7 +189,7 @@ export function BirdCollection({
           <ArrowRight size={19} aria-hidden="true" />
         </button>
       ) : null}
-      {!isLoading && (!rewardDate || reward) ? (
+      {!prominent && !isLoading && (!rewardDate || reward) ? (
         <p className="bird-teaser">
           {next ? (
             <>
@@ -168,10 +288,11 @@ export function BirdCollection({
                             }
                           >
                             <img
-                              src={`/birds/${bird.id}.svg`}
+                              src={`/birds/${bird.id}.webp`}
                               alt=""
                               width="160"
                               height="110"
+                              loading="lazy"
                             />
                             <span>
                               {unlocked ? (
@@ -205,7 +326,7 @@ export function BirdCollection({
                 >
                   Botanic Garden
                 </a>
-                . Illustrations are stylized; real birds vary with age and sex.
+                . AI-painted illustrations; real birds vary with age and sex.
               </p>
             </>
           )}
@@ -219,8 +340,8 @@ function BirdDetail({ bird }: { bird: Bird }) {
   return (
     <article className="bird-detail">
       <img
-        src={`/birds/${bird.id}.svg`}
-        alt={`Stylized illustration of ${bird.name}`}
+        src={`/birds/${bird.id}.webp`}
+        alt={`Natural-history painting of ${bird.name}`}
         width="320"
         height="220"
       />
