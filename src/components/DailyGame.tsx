@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ArrowRight, Check, Clock3, HelpCircle, Medal, Pencil, Play, Trophy, UserRound } from "lucide-react";
 import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BirdCollection, NextBirdDiscovery } from "@/components/BirdCollection";
 import { BottomSheet } from "@/components/BottomSheet";
 import { GoldGleam, StreakFlame } from "@/components/Celebrations";
 import { MathText } from "@/components/MathText";
@@ -1147,11 +1148,11 @@ export function DailyGame({
         ) : null}
 
         {mode === "score" && currentResult ? (
-          <ScoreScreen isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
+          <ScoreScreen history={history} todayKey={todayDateKey} isSaving={isSavingResult} onContinue={handleScoreContinue} result={currentResult} />
         ) : null}
 
         {mode === "streak" ? (
-          <StreakScreen onContinue={handleStreakContinue} streak={streak} />
+          <StreakScreen history={history} todayKey={todayDateKey} onContinue={handleStreakContinue} streak={streak} />
         ) : null}
       </ScreenTransition>
     </main>
@@ -1306,51 +1307,8 @@ function HomeScreen({
     setIsProfileOpen(false);
   }, []);
 
-  return (
-    <section className="game-screen home-card" aria-label="Three Qs home">
-      <div className="home-content">
-        <div className="home-topbar">
-          <p className="today-label home-date">{formatDateKey(dateKey)}</p>
-          <button
-            aria-label={
-              leaderboardPosition
-                ? `Open leaderboard, you are #${leaderboardPosition}`
-                : "Open leaderboard"
-            }
-            className="leaderboard-trigger"
-            onClick={() => setIsLeaderboardOpen(true)}
-            type="button"
-          >
-            <Trophy size={17} />
-            <span>{leaderboardPosition ? `#${leaderboardPosition}` : "Leaderboard"}</span>
-          </button>
-        </div>
-
-        <div aria-hidden="true" />
-
-        <div className="home-copy">
-          <h1 className="home-wordmark">
-            Three<span className="home-wordmark-qs">Qs</span>
-          </h1>
-          <p>Your daily math superbowl challenge</p>
-        </div>
-
-        <div aria-hidden="true" />
-
-        {savedName ? (
-          <HomeStreakStrip
-            days={streakDays.days}
-            hasActiveDay={streakDays.hasActiveDay}
-            isLoading={isHomeHistoryLoading}
-            onSelectDay={onSelectStreakDay}
-          />
-        ) : (
-          <div className="home-streak-blank" aria-hidden="true" />
-        )}
-
-        <div aria-hidden="true" />
-
-        <form className="home-form" onSubmit={onSubmit}>
+  const discoveryAction = (
+        <form className={`home-form ${savedName ? "has-saved-player" : ""}`} onSubmit={onSubmit}>
           <div className="name-field">
             <span className="name-field-label" id={nameLabelId}>
               {savedName ? "Player" : "Your Name"}
@@ -1394,7 +1352,51 @@ function HomeScreen({
             <Play size={19} fill="currentColor" />
             {primaryActionLabel}
           </button>
+          <p className="home-discovery-note">Three questions. Any score. A bird to keep.</p>
         </form>
+  );
+
+  return (
+    <section className="game-screen home-card" aria-label="Three Qs home">
+      <div className="home-content">
+        <div className="home-topbar">
+          <h1 className="home-wordmark">Three<span className="home-wordmark-qs">Qs</span></h1>
+          <button
+            aria-label={
+              leaderboardPosition
+                ? `Open leaderboard, you are #${leaderboardPosition}`
+                : "Open leaderboard"
+            }
+            className="leaderboard-trigger"
+            onClick={() => setIsLeaderboardOpen(true)}
+            type="button"
+          >
+            <Trophy size={17} />
+            <span>{leaderboardPosition ? `#${leaderboardPosition}` : "Leaderboard"}</span>
+          </button>
+        </div>
+
+        <BirdCollection
+          key={savedName}
+          history={savedName ? history : []}
+          todayKey={dateKey}
+          isLoading={isHomeHistoryLoading}
+          prominent
+          action={discoveryAction}
+        />
+
+
+
+        {savedName ? (
+          <div className="home-history">
+            <HomeStreakStrip
+              days={streakDays.days}
+              hasActiveDay={streakDays.hasActiveDay}
+              isLoading={isHomeHistoryLoading}
+              onSelectDay={onSelectStreakDay}
+            />
+          </div>
+        ) : null}
       </div>
 
       <BottomSheet
@@ -2292,12 +2294,14 @@ function FeedbackSheet({
 }
 
 type ScoreScreenProps = {
+  history: DailyResult[];
+  todayKey: string;
   isSaving: boolean;
   onContinue(): void;
   result: DailyResult;
 };
 
-function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
+function ScoreScreen({ history, todayKey, isSaving, onContinue, result }: ScoreScreenProps) {
   const medalLabel = getMedalLabel(result.medal);
 
   return (
@@ -2315,6 +2319,8 @@ function ScoreScreen({ isSaving, onContinue, result }: ScoreScreenProps) {
             You scored <strong>{result.totalScore}</strong> out of {MAX_DAILY_SCORE} points.
           </p>
         </div>
+
+        <BirdCollection history={[...history.filter((entry) => entry.dateKey !== result.dateKey), result]} todayKey={todayKey} rewardDate={result.dateKey} />
 
         <ul className="question-breakdown">
           {result.questionResults.map((question) => (
@@ -2365,21 +2371,24 @@ function getPromptSizeClass(prompt: string): string {
 }
 
 type StreakScreenProps = {
+  history: DailyResult[];
+  todayKey: string;
   onContinue(): void;
   streak: number;
 };
 
-function StreakScreen({ onContinue, streak }: StreakScreenProps) {
+function StreakScreen({ history, todayKey, onContinue, streak }: StreakScreenProps) {
   return (
     <section className="game-screen streak-card" aria-label="Current streak">
       <div className="card-body">
-        <StreakFlame />
+        <div className="completion-streak-flame"><StreakFlame /></div>
 
         <div className="streak-copy">
           <p className="today-label">Current streak</p>
           <h1>{streak}</h1>
           <p>{streak === 1 ? "day" : "days"} in a row</p>
         </div>
+        <NextBirdDiscovery history={history} todayKey={todayKey} />
       </div>
 
       <button className="primary-action" onClick={onContinue} type="button">

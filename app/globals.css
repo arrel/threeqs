@@ -2204,3 +2204,509 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* The field guide uses quiet coastal colors, with original local SVG artwork. */
+.bird-collection {
+  width: 100%;
+  text-align: left;
+}
+.bird-album-trigger,
+.bird-reward {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #cedaca;
+  border-radius: 16px;
+  background: #f2f5eb;
+  color: #29493f;
+  text-align: left;
+  cursor: pointer;
+}
+.bird-album-trigger > span,
+.bird-reward > span {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+}
+.bird-album-trigger strong {
+  font-size: 14px;
+}
+.bird-album-trigger small,
+.bird-reward small {
+  font-size: 12px;
+  color: #52685a;
+}
+.bird-album-trigger:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.bird-teaser {
+  margin: 8px 4px 0;
+  color: #57655c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.bird-reward img {
+  width: 94px;
+  height: auto;
+  border-radius: 10px;
+}
+.bird-reward strong {
+  font-size: 17px;
+  line-height: 1.25;
+}
+.bird-reward span span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.bird-album-sheet {
+  max-height: 88%;
+  background: #fffdf6;
+}
+.bird-album-content {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 0 22px 28px;
+  text-align: left;
+}
+.bird-album-kicker {
+  color: #637561;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  margin: 18px 0 8px;
+  text-transform: uppercase;
+}
+.bird-album-heading {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 29px;
+  color: #284b3e;
+  line-height: 1.15;
+  margin: 0 0 12px;
+}
+.bird-album-intro,
+.bird-next,
+.bird-spotting p {
+  color: #566356;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.bird-progress {
+  margin: 20px 0;
+  display: grid;
+  gap: 8px;
+  color: #365743;
+  font-size: 12px;
+  font-weight: 700;
+}
+.bird-progress progress {
+  width: 100%;
+  height: 7px;
+  accent-color: #527859;
+}
+.bird-next,
+.bird-complete {
+  border-radius: 12px;
+  padding: 14px;
+  background: #edf1e3;
+}
+.bird-habitat h3 {
+  margin: 24px 0 12px;
+  font-size: 16px;
+  color: #294b3c;
+}
+.bird-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.bird-tile {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #dce1d3;
+  background: #fffef8;
+  border-radius: 13px;
+  text-align: left;
+  color: #294b3c;
+  cursor: pointer;
+}
+.bird-tile img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0;
+}
+.bird-tile > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.bird-tile.locked {
+  cursor: default;
+  color: #738071;
+}
+.bird-tile.locked img {
+  filter: grayscale(1) brightness(0.35);
+  opacity: 0.22;
+}
+.bird-back {
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: #42624d;
+  cursor: pointer;
+  font-weight: 700;
+}
+.bird-detail > img {
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+  display: block;
+}
+.bird-detail h3 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 29px;
+  line-height: 1.15;
+  color: #284b3e;
+  margin: 8px 0 16px;
+}
+.bird-fact {
+  font-size: 17px;
+  line-height: 1.6;
+  color: #364b40;
+}
+.bird-spotting {
+  padding: 16px;
+  background: #edf1e3;
+  border-radius: 12px;
+  margin: 18px 0;
+}
+.bird-spotting strong {
+  color: #365743;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.bird-spotting p {
+  margin: 8px 0 0;
+}
+.bird-source,
+.bird-sources {
+  color: #5f7160;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.bird-sources {
+  margin-top: 24px;
+}
+.bird-sources a,
+.bird-source {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bird-collection button:focus-visible,
+.bird-collection a:focus-visible {
+  outline: 3px solid #56826a;
+  outline-offset: 3px;
+}
+.score-card:has(.bird-reward) .card-body {
+  gap: 16px;
+}
+.score-card:has(.bird-reward) .medal-emblem {
+  width: 88px;
+  height: 88px;
+}
+.bird-album-sheet .bottom-sheet-title {
+  font-size: 22px;
+}
+.bird-detail > img {
+  max-height: 240px;
+  object-fit: contain;
+  background: #edf0e3;
+}
+
+/* Birds lead the home screen; quiz history is a quiet secondary section. */
+.home-content {
+  grid-template-rows: auto auto auto auto;
+  align-content: start;
+  gap: 22px;
+  padding-top: 22px;
+  background: #fffdf6;
+}
+.home-topbar {
+  margin: 0;
+  gap: 16px;
+}
+.home-topbar .home-wordmark {
+  margin: 0;
+  color: #29483b;
+  font-family: "Paytone One", sans-serif;
+  font-size: 26px;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.home-topbar .home-wordmark-qs {
+  color: #b58b46;
+}
+.home-topbar .leaderboard-trigger {
+  font-size: 11px;
+  padding: 8px 11px;
+  background: transparent;
+  box-shadow: none;
+  border-color: #e1e2d5;
+  color: #68715b;
+}
+.bird-home-heading .bird-album-kicker {
+  margin: 0 0 8px;
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+.bird-home-heading h2 {
+  margin: 0 0 18px;
+  max-width: 360px;
+  font-family: Georgia, serif;
+  font-size: clamp(28px, 7vw, 36px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.9px;
+  color: #29483b;
+}
+.bird-home-art {
+  display: block;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #e6e8d6;
+  text-align: left;
+}
+.bird-home-art > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  transition: transform 400ms ease;
+}
+.bird-home-art:hover > img {
+  transform: scale(1.025);
+}
+.bird-home-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 7px 9px;
+  background: rgba(255, 253, 244, 0.91);
+  border: 1px solid #fffc;
+  border-radius: 5px;
+  color: #425540;
+  font-size: 8px;
+  letter-spacing: 1.1px;
+  font-weight: 800;
+}
+.bird-home-number {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: rgba(255, 253, 244, 0.9);
+  color: #425540;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.bird-home-story {
+  margin: 15px 0 17px;
+}
+.bird-home-habitat {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1.6px;
+  font-weight: 800;
+  color: #7b8068;
+}
+.bird-home-story h3 {
+  margin: 5px 0 7px;
+  font-family: Georgia, serif;
+  font-size: 25px;
+  font-weight: 400;
+  letter-spacing: -0.5px;
+  color: #29483b;
+}
+.bird-home-story p {
+  margin: 0;
+  color: #52604c;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.bird-home-invitation {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #7a7e6c;
+}
+.bird-home-album {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid #e0e2d5;
+  border-bottom: 1px solid #e0e2d5;
+  color: #36513e;
+  background: transparent;
+  text-align: left;
+}
+.bird-home-album > span:nth-child(2) {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+.bird-home-album strong {
+  font-size: 13px;
+}
+.bird-home-album small {
+  font-size: 11px;
+  font-weight: 500;
+  color: #7b816e;
+}
+.bird-home-thumbnails {
+  display: flex;
+  padding-right: 5px;
+}
+.bird-home-thumbnails img {
+  width: 36px;
+  height: 43px;
+  object-fit: cover;
+  border: 2px solid #fffdf6;
+  border-radius: 5px;
+  margin-right: -9px;
+  transform: rotate(-7deg);
+}
+.bird-home-thumbnails img:nth-child(2) {
+  transform: rotate(0);
+}
+.bird-home-thumbnails img:nth-child(3) {
+  transform: rotate(7deg);
+}
+.bird-home-thumbnails .uncollected {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+.bird-home-tomorrow {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #737b65;
+  margin: 12px 0 0;
+}
+.home-form {
+  margin: 0;
+  gap: 10px;
+}
+.home-card .name-field-label {
+  font-size: 11px;
+  min-height: 0;
+  color: #737b65;
+}
+.home-card .name-display {
+  min-height: 48px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-color: #dce0d0;
+  background: #fafbf3;
+  box-shadow: none;
+}
+.home-card .home-play-action {
+  background: #385c44;
+  box-shadow: 0 6px 18px #35554018;
+  min-height: 54px;
+}
+.home-card .home-play-action:hover {
+  background: #294b36;
+}
+.home-discovery-note {
+  text-align: center;
+  font-size: 11px;
+  color: #7b816e;
+  margin: 0;
+}
+.home-history {
+  border-top: 1px solid #e0e2d5;
+  padding-top: 20px;
+}
+.bird-tile img {
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+}
+.bird-detail > img {
+  max-height: none;
+  object-fit: cover;
+  background: #edf0e3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bird-home-art > img {
+    transition: none;
+  }
+  .bird-home-art:hover > img {
+    transform: none;
+  }
+}
+.home-card {
+  height: calc(100svh - 48px);
+  min-height: 0;
+}
+.home-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (max-width: 560px) {
+  .home-card {
+    height: 100svh;
+  }
+}
+.bird-home .home-form { margin: 18px 0; }
+.home-form.has-saved-player .home-play-action { grid-row: 1; }
+.home-form.has-saved-player .home-discovery-note { grid-row: 2; }
+
+/* Unearned birds stay mysterious everywhere, including on hover. */
+.bird-mystery { position: relative; overflow: hidden; isolation: isolate; background: #c7c9ae; }
+.bird-mystery > img, .bird-home-art.bird-mystery:hover > img { filter: blur(20px) saturate(.65) brightness(.85); transform: scale(1.12); user-select: none; pointer-events: none; }
+.bird-mystery::after { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, #ece6c92b, #334f3540); pointer-events: none; z-index: 0; }
+.bird-mystery-mark { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid #fff8; border-radius: 50%; background: #fffdf034; color: #fffdf6; font-family: Georgia, serif; font-size: 44px; z-index: 1; }
+.bird-mystery .bird-home-tag, .bird-mystery .bird-home-number { z-index: 1; }
+.bird-tile.locked img { filter: blur(12px) grayscale(.7) brightness(.8); opacity: .45; }
+.bird-home-thumbnails .uncollected { filter: blur(5px) grayscale(1); }
+.bird-next-discovery { width: 100%; text-align: center; }
+.bird-next-discovery h2 { margin: 10px 0 22px; font-family: Georgia, serif; font-size: clamp(28px, 7vw, 36px); font-weight: 400; color: #29483b; line-height: 1.15; }
+.bird-next-art { border-radius: 18px; }
+.bird-next-art img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
+.bird-next-clue { font-size: 19px; line-height: 1.5; color: #36513e; margin: 22px 0 10px; }
+.bird-next-invitation, .bird-collection-finale { font-size: 14px; line-height: 1.5; color: #69745e; }
+.streak-card:has(.bird-next-discovery) { background: #fffdf6; }
+.streak-card:has(.bird-next-discovery) .completion-streak-flame { display: none; }
+.streak-card:has(.bird-next-discovery) .streak-copy { display: flex; align-items: baseline; justify-content: center; gap: 8px; order: 2; margin-top: 10px; }
+.streak-card:has(.bird-next-discovery) .streak-copy h1 { font-size: 25px; text-shadow: none; color: #385c44; }
+.streak-card:has(.bird-next-discovery) .streak-copy p { font-size: 12px; margin: 0; }
+.bird-lightbox { position: fixed; inset: 0; z-index: 1000; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; background: #fffdf6; color: #29483b; }
+.bird-lightbox-header { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 16px clamp(20px, 4vw, 64px); background: #fffdf6f5; border-bottom: 1px solid #e3e3d5; font-size: 14px; font-weight: 700; }
+.bird-lightbox-header button { display: grid; place-items: center; min-width: 44px; min-height: 44px; border-radius: 50%; border: 1px solid #d9dfd0; color: #29483b; background: transparent; }
+.bird-lightbox-content { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr); align-items: center; gap: clamp(24px, 4vw, 64px); max-width: 1800px; min-height: calc(100dvh - 78px); padding: clamp(20px, 4vw, 64px); margin: 0 auto; }
+.bird-lightbox-image img { display: block; width: 100%; height: auto; max-height: calc(100dvh - 130px); object-fit: contain; border-radius: 16px; }
+.bird-lightbox-story h1 { font-family: Georgia, serif; font-size: clamp(32px, 4vw, 60px); font-weight: 400; line-height: 1.06; letter-spacing: -1.4px; margin: 12px 0 24px; }
+.bird-lightbox-story .bird-fact { font-size: clamp(17px, 1.5vw, 23px); }
+.bird-lightbox :focus-visible { outline: 3px solid #56826a; outline-offset: 4px; }
+@media (max-width: 850px) { .bird-lightbox-content { grid-template-columns: 1fr; align-content: start; min-height: 0; gap: 24px; } .bird-lightbox-image img { max-height: 62dvh; } }

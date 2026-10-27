@@ -32,7 +32,7 @@ describe("DailyGame", () => {
   it("lets a student complete the three-question flow and locks the daily result", async () => {
     const user = userEvent.setup();
     const storage = createMemoryStorage();
-    const today = new Date("2026-06-24T18:00:00Z");
+    const today = new Date("2026-10-25T18:00:00Z");
     const dateKey = getPacificDateKey(today);
     const dailyProblems = selectDailyProblems(problems, dateKey);
 
@@ -55,9 +55,16 @@ describe("DailyGame", () => {
 
     expect(screen.getByText(/challenge complete/i)).toBeInTheDocument();
     expect(screen.getByText(/out of 390 points/i)).toBeInTheDocument();
+    expect(screen.getByText("Anna’s Hummingbird")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Meet your bird/ }));
+    expect(screen.getByText(/freeway speed/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close bird detail" }));
 
     await user.click(getButtonByText(/^continue$/i));
     expect(screen.getByText(/current streak/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Tomorrow’s discovery" })).toBeInTheDocument();
+    expect(screen.getByText("An acorn thief dressed in blue.")).toBeInTheDocument();
+    expect(screen.queryByText("California Scrub-Jay")).not.toBeInTheDocument();
     await user.click(getButtonByText(/^continue$/i));
     expect(
       screen.getByRole("heading", { name: "ThreeQs" }),
